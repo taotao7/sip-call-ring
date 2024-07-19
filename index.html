@@ -1,974 +1,1352 @@
 <html>
-<head>
-    <meta charset="UTF-8">
-    <title>话务条</title>
-    <meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1,maximum-scale=1,user-scalable=no">
-    <script src="lib/bundle.browser.js"></script>
-    <script src="https://lf6-cdn-tos.bytecdntp.com/cdn/expire-1-M/vue/2.6.14/vue.min.js"></script>
-    <script src="https://lf26-cdn-tos.bytecdntp.com/cdn/expire-1-M/vConsole/3.12.1/vconsole.min.js"
-            type="application/javascript"></script>
-    <link rel="stylesheet"
-          href="https://lf6-cdn-tos.bytecdntp.com/cdn/expire-1-M/element-ui/2.15.7/theme-chalk/index.min.css">
-    <script src="https://lf26-cdn-tos.bytecdntp.com/cdn/expire-1-M/element-ui/2.15.7/index.min.js"></script>
-    <script src="https://lf1-cdn-tos.bytegoofy.com/obj/iconpark/icons_14274_28.22d8df2a1d7d6a49caf18bfcc2e01f75.js"></script>
-    <script src="https://lf3-cdn-tos.bytecdntp.com/cdn/expire-1-M/vue-i18n/8.9.0/vue-i18n.min.js"></script>
-
-</head>
-<body>
-<div id="app">
-    <div style="display:none;">
-        <video id="audioView" autoplay></video>
-    </div>
-
-
-    <el-card class="my-softphone" :body-style="{padding: '0px'}">
-        <div>
-            <div class="status">
-                <div v-if="!statusIsCall && !statusIsring">
-                    <div v-show="!statusIsLogin" style="padding:10px 0 0 0px;">
-                        <el-badge is-dot type="info" class="item"></el-badge>
-                        {{ $t("message.NotLoggedIn") }}
-                    </div>
-                    <div v-show="statusIsLogin" style="padding:10px 0 0 0px;">
-                        <el-badge is-dot type="success" class="item"></el-badge>
-                        {{ $t('message.online') }}:<span class="number">{{ agentNo }}</span>
-                    </div>
-                </div>
-                <div v-show="statusIsCall || statusIsring">
-                    <div class="text">{{$t('message.number')}}：<span class="number">{{ discallee }}</span></div>
-                    <div class="text">{{$t('message.duration')}}：<span class="number">{{ callTime }}</span></div>
-                </div>
+    <head>
+        <meta charset="UTF-8" />
+        <title>话务条</title>
+        <meta
+            name="viewport"
+            content="width=device-width,initial-scale=1,minimum-scale=1,maximum-scale=1,user-scalable=no"
+        />
+        <script src="lib/bundle.browser.js"></script>
+        <script src="https://lf6-cdn-tos.bytecdntp.com/cdn/expire-1-M/vue/2.6.14/vue.min.js"></script>
+        <script
+            src="https://lf26-cdn-tos.bytecdntp.com/cdn/expire-1-M/vConsole/3.12.1/vconsole.min.js"
+            type="application/javascript"
+        ></script>
+        <link
+            rel="stylesheet"
+            href="https://lf6-cdn-tos.bytecdntp.com/cdn/expire-1-M/element-ui/2.15.7/theme-chalk/index.min.css"
+        />
+        <script src="https://lf26-cdn-tos.bytecdntp.com/cdn/expire-1-M/element-ui/2.15.7/index.min.js"></script>
+        <script src="https://lf1-cdn-tos.bytegoofy.com/obj/iconpark/icons_14274_28.22d8df2a1d7d6a49caf18bfcc2e01f75.js"></script>
+        <script src="https://lf3-cdn-tos.bytecdntp.com/cdn/expire-1-M/vue-i18n/8.9.0/vue-i18n.min.js"></script>
+    </head>
+    <body>
+        <div id="app">
+            <div style="display: none">
+                <video id="audioView" autoplay></video>
             </div>
 
-            <div class="btn">
-                <div v-if="!statusIsCall">
-                    <div v-if="!statusIsLogin" class="soft-function" @click="login">
-                        <iconpark-icon name="checkIn-qianru"></iconpark-icon>
-                        <div class="text">{{$t('message.login')}}</div>
-                    </div>
-                    <div v-else class="soft-function" @click="logout">
-                        <iconpark-icon name="checkOut-qianchu"></iconpark-icon>
-                        <div class="text">{{$t('message.logout')}}</div>
-                    </div>
-                </div>
-
-                <div v-if="statusIsCall && false" class="soft-function" :class="{disabled:!statusIsCall}">
-                    <iconpark-icon name="transfer-zhuanjie"></iconpark-icon>
-                    <div class="text">{{$t('message.transfer')}}</div>
-                </div>
-
-                <div v-if="statusIsCall" :class="{disabled:!statusIsCall}">
-                    <div v-if="disableMic" class="soft-function" :class="{hold:disableMic}" @click="mute">
-                        <iconpark-icon name="mute-jingyin"></iconpark-icon>
-                        <div class="text">{{$t('message.enable')}}</div>
-                    </div>
-                    <div v-else class="soft-function" :class="{unhold:!disableMic}" @click="mute">
-                        <iconpark-icon name="cancelMute-quxiaojingyin"></iconpark-icon>
-                        <div class="text">{{$t('message.mute')}}</div>
-                    </div>
-                </div>
-
-                <div v-if="statusIsCall" :class="{disabled:!statusIsCall}">
-                    <div v-if="!statusIsHold" class="soft-function" :class="{hold:!statusIsHold}" @click="hold">
-                        <iconpark-icon name="keepHold-baochi"></iconpark-icon>
-                        <div class="text">{{$t('message.hold')}}</div>
-                    </div>
-                    <div v-else class="soft-function" :class="{unhold:statusIsHold}" @click="unhold">
-                        <iconpark-icon name="takeBack-jiehui"></iconpark-icon>
-                        <div class="text">{{$t('message.retrieve')}}</div>
-                    </div>
-                </div>
-
-                <div v-if="(statusIsring || statusIsCall)" class="soft-function"
-                     :class="{disabled:!(statusIsring || statusIsCall)}" @click="hungup">
-                    <iconpark-icon name="phone-off"></iconpark-icon>
-                    <div class="text">{{$t('message.hangUp')}}</div>
-                </div>
-
-                <div v-if="(statusIsring && 'inbound' === callDirection)" class="soft-function"
-                     :class="{disabled:!(statusIsring && 'inbound' === callDirection)}"
-                     @click="answer">
-                    <iconpark-icon name="phone-call"></iconpark-icon>
-                    <div class="text">{{$t('message.answer')}}</div>
-                </div>
-            </div>
-        </div>
-    </el-card>
-
-    <el-card v-show="statusIsLogin" class="config">
-        <div v-if="latency_stat!=undefined">
-            <el-row :gutter="20">
-                {{$t('message.delay')}}:{{latency_stat.latencyTime}}ms.
-                {{$t('message.packetLoss')}}:
-                <iconpark-icon name="up-small" style="color: green"></iconpark-icon>
-                {{(latency_stat.upLossRate * 100).toFixed(2)}}% /
-                <iconpark-icon name="down-small" style="color: red"></iconpark-icon>
-                {{(latency_stat.downLossRate * 100).toFixed(2)}}%
-            </el-row>
-
-            <el-row>
-                <el-col :span="1">
-                    <iconpark-icon name="microphone"></iconpark-icon>
-                </el-col>
-                <el-col :span="23">
-                    <el-progress :stroke-width="24" :percentage="latency_stat.upAudioLevel*100" color="green" :show-text="false"></el-progress>
-                </el-col>
-            </el-row>
-
-            <el-row style="padding-top: 2px">
-                <el-col :span="1">
-                    <iconpark-icon name="cancelMute-quxiaojingyin"></iconpark-icon>
-                </el-col>
-                <el-col :span="23">
-                    <el-progress
-                            :stroke-width="24"
-                            :percentage="latency_stat.downAudioLevel*100"
-                            color="red"
-                            :show-text="false"></el-progress>
-                </el-col>
-            </el-row>
-        </div>
-        <div v-if="callEndInfo!== undefined">
-            <span v-if="callEndInfo.answered"><el-tag type="success">{{$t('message.connected')}}</el-tag></span>
-            <span v-if="!callEndInfo.answered"><el-tag type="danger">{{$t('message.notConnected')}}</el-tag></span>
-            <span v-if="callEndInfo.originator==='remote'"><el-tag type="warning">{{$t('message.partyHungUp')}}</el-tag></span>
-            <span v-if="callEndInfo.originator==='local'"><el-tag type="success">{{$t('message.selfInitiatedHangUp')}}</el-tag></span>
-            <span v-if="!callEndInfo.answered"><strong>{{$t('message.hangUpReason')}}:</strong>{{callEndInfo.code}} {{callEndInfo.cause}}</span>
-            <br/>
-        </div>
-        <div style="padding-top: 5px">
-            <el-input v-model="callPhoneNumber" :placeholder="$t('message.pleaseEnterTheOutboundNumber')"></el-input>
-        </div>
-        <div style="margin-top: 5px">
-            <div style="display: flex;width: 100%;">
-                <div style="width:75%;">
-                    <div style="display: flex;height: 50px;">
-                        <div class="number-card-button" @click="pressNumber('1')">1</div>
-                        <div class="number-card-button" @click="pressNumber('2')">2</div>
-                        <div class="number-card-button" @click="pressNumber('3')">3</div>
-                    </div>
-                    <div style="display: flex;height: 50px;">
-                        <div class="number-card-button" @click="pressNumber('4')">4</div>
-                        <div class="number-card-button" @click="pressNumber('5')">5</div>
-                        <div class="number-card-button" @click="pressNumber('6')">6</div>
-                    </div>
-                </div>
-                <div style="width:25%;height: 100px;margin-left: 5px">
-                    <el-button class="number-op"
-                               :disabled="!statusIsLogin || statusIsring || statusIsCall"
-                               type="primary"
-                               @click="makeCall">
-                        <iconpark-icon name="phone-telephone"></iconpark-icon>
-                    </el-button>
-                </div>
-            </div>
-            <div style="display: flex;width: 100%;">
-                <div style="width:75%;">
-                    <div style="display: flex;height: 50px;">
-                        <div class="number-card-button" @click="pressNumber('7')">7</div>
-                        <div class="number-card-button" @click="pressNumber('8')">8</div>
-                        <div class="number-card-button" @click="pressNumber('9')">9</div>
-                    </div>
-                    <div style="display: flex;height: 50px;">
-                        <div class="number-card-button" @click="pressNumber('*')">*</div>
-                        <div class="number-card-button" @click="pressNumber('0')">0</div>
-                        <div class="number-card-button" @click="pressNumber('#')">#</div>
-                    </div>
-                </div>
-                <div style="width:25%;height: 100px;margin-left: 5px">
-                    <el-button class="number-op"
-                               type="info"
-                               @click="backspaceNumber()">
-                        <iconpark-icon name="delete-two"></iconpark-icon>
-                    </el-button>
-                </div>
-            </div>
-        </div>
-    </el-card>
-
-    <el-tabs v-show="!statusIsLogin" class="config" type="border-card" v-model="activeTabName">
-        <el-tab-pane :label="$t('message.ParameterSetting')" name="base">
-            <div>
-                <el-form ref="form" size="mini" label-position="left" label-width="100px">
-                    <el-form-item :label="$t('message.serverAddress')">
-                        <el-input type="text" v-model="configuration.host" clearable/>
-                    </el-form-item>
-                    <el-form-item :label="$t('message.serverPort')">
-                        <el-input type="text" v-model="configuration.port" maxlength="5" clearable/>
-                    </el-form-item>
-
-                    <el-form-item :label="$t('message.extensionNumber')">
-                        <el-input type="text" v-model="configuration.extNo" clearable/>
-                    </el-form-item>
-                    <el-form-item :label="$t('message.password')">
-                        <el-input type="password" v-model="configuration.extPwd" clearable show-password/>
-                    </el-form-item>
-
-                    <el-form-item :label="$t('message.autoAnswer')">
-                        <el-switch v-model="autoAnswer" active-color="#13ce66" inactive-color="#666666"></el-switch>
-                    </el-form-item>
-
-                    <el-collapse>
-                        <el-collapse-item :title="$t('message.advancedSetting')">
-                            <el-form-item label="Language">
-                                <el-select v-model="locale" @change="chooseLanguage">
-                                    <el-option
-                                            v-for="item in locales"
-                                            :key="item.value" :label="item.label" :value="item.value">
-                                    </el-option>
-                                </el-select>
-                            </el-form-item>
-                            <el-form-item label="SSL">
-                                <el-switch v-model="configuration.proto"/>
-                            </el-form-item>
-                            <el-form-item label="Domain">
-                                <el-input type="text" v-model="configuration.domain" placeholder="选填" clearable/>
-                            </el-form-item>
-                            <el-form-item label="IceType">
-                                <el-radio-group v-model="configuration.stun.type">
-                                    <el-radio label="stun">STUN</el-radio>
-                                    <el-radio label="turn">TURN</el-radio>
-                                </el-radio-group>
-                            </el-form-item>
-                            <el-form-item label="IceHost">
-                                <el-input type="text" v-model="configuration.stun.host" clearable/>
-                            </el-form-item>
-                            <el-form-item v-if="configuration.stun.type==='turn'" label="username">
-                                <el-input type="text" v-model="configuration.stun.username" clearable/>
-                            </el-form-item>
-                            <el-form-item v-if="configuration.stun.type==='turn'" label="credential">
-                                <el-input type="password" v-model="configuration.stun.password" clearable
-                                          show-password/>
-                            </el-form-item>
-                            <el-form-item :label="$t('message.autoMute')">
-                                <el-switch v-model="autoDisableMic" active-color="#13ce66"
-                                           inactive-color="#666666"></el-switch>
-                            </el-form-item>
-                        </el-collapse-item>
-                    </el-collapse>
-                </el-form>
-            </div>
-
-            <div v-if="historyAccounts.length>0">
-                <el-divider content-position="left">{{$t("message.historicalAccountNumber")}}</el-divider>
+            <el-card class="my-softphone" :body-style="{padding: '0px'}">
                 <div>
-                    <el-table :data="historyAccounts" stripe style="width: 100%" size="mini" :show-header="false">
-                        <el-table-column type="expand" width="15">
-                            <template slot-scope="props">
-                                <el-descriptions :column="1" size="mini" border>
-                                    <el-descriptions-item :label="$t('message.serverAddress')">{{ props.row.host
-                                        }}:{{ props.row.port }}
-                                    </el-descriptions-item>
-                                    <el-descriptions-item :label="$t('message.extensionNumber')">{{ props.row.extNo }}
-                                    </el-descriptions-item>
-                                    <el-descriptions-item :label="$t('message.password')">{{ props.row.extPwd }}
-                                    </el-descriptions-item>
-                                </el-descriptions>
-                            </template>
-                        </el-table-column>
-                        <el-table-column label="SERVER">
-                            <template slot-scope="scope">
-                                <span style="font-size: 14px">{{ scope.row.extNo }}@{{
-                                        scope.row.host
-                                    }}:{{ scope.row.port }}</span>
-                            </template>
-                        </el-table-column>
-                        <el-table-column label="操作" width="136">
-                            <template slot-scope="scope">
-                                <el-button-group>
-                                    <el-button size="mini" type="primary" :disabled="statusIsLogin"
-                                               @click="useHistoryAccounts(scope.row.host+scope.row.extNo)">
-                                        {{$t("message.use")}}
-                                    </el-button>
-                                    <el-button size="mini" type="danger" :disabled="statusIsLogin"
-                                               @click="accountDel(scope.row.host+scope.row.extNo)">
-                                        {{$t("message.delete")}}
-                                    </el-button>
-                                </el-button-group>
-                            </template>
-                        </el-table-column>
-                    </el-table>
+                    <div class="status">
+                        <div v-if="!statusIsCall && !statusIsring">
+                            <div
+                                v-show="!statusIsLogin"
+                                style="padding: 10px 0 0 0px"
+                            >
+                                <el-badge
+                                    is-dot
+                                    type="info"
+                                    class="item"
+                                ></el-badge>
+                                {{ $t("message.NotLoggedIn") }}
+                            </div>
+                            <div
+                                v-show="statusIsLogin"
+                                style="padding: 10px 0 0 0px"
+                            >
+                                <el-badge
+                                    is-dot
+                                    type="success"
+                                    class="item"
+                                ></el-badge>
+                                {{ $t('message.online') }}:<span class="number"
+                                    >{{ agentNo }}</span
+                                >
+                            </div>
+                        </div>
+                        <div v-show="statusIsCall || statusIsring">
+                            <div class="text">
+                                {{$t('message.number')}}：<span class="number"
+                                    >{{ discallee }}</span
+                                >
+                            </div>
+                            <div class="text">
+                                {{$t('message.duration')}}：<span class="number"
+                                    >{{ callTime }}</span
+                                >
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="btn">
+                        <div v-if="!statusIsCall">
+                            <div
+                                v-if="!statusIsLogin"
+                                class="soft-function"
+                                @click="login"
+                            >
+                                <iconpark-icon
+                                    name="checkIn-qianru"
+                                ></iconpark-icon>
+                                <div class="text">{{$t('message.login')}}</div>
+                            </div>
+                            <div v-else class="soft-function" @click="logout">
+                                <iconpark-icon
+                                    name="checkOut-qianchu"
+                                ></iconpark-icon>
+                                <div class="text">{{$t('message.logout')}}</div>
+                            </div>
+                        </div>
+
+                        <div
+                            v-if="statusIsCall && false"
+                            class="soft-function"
+                            :class="{disabled:!statusIsCall}"
+                        >
+                            <iconpark-icon
+                                name="transfer-zhuanjie"
+                            ></iconpark-icon>
+                            <div class="text">{{$t('message.transfer')}}</div>
+                        </div>
+
+                        <div
+                            v-if="statusIsCall"
+                            :class="{disabled:!statusIsCall}"
+                        >
+                            <div
+                                v-if="disableMic"
+                                class="soft-function"
+                                :class="{hold:disableMic}"
+                                @click="mute"
+                            >
+                                <iconpark-icon
+                                    name="mute-jingyin"
+                                ></iconpark-icon>
+                                <div class="text">{{$t('message.enable')}}</div>
+                            </div>
+                            <div
+                                v-else
+                                class="soft-function"
+                                :class="{unhold:!disableMic}"
+                                @click="mute"
+                            >
+                                <iconpark-icon
+                                    name="cancelMute-quxiaojingyin"
+                                ></iconpark-icon>
+                                <div class="text">{{$t('message.mute')}}</div>
+                            </div>
+                        </div>
+
+                        <div
+                            v-if="statusIsCall"
+                            :class="{disabled:!statusIsCall}"
+                        >
+                            <div
+                                v-if="!statusIsHold"
+                                class="soft-function"
+                                :class="{hold:!statusIsHold}"
+                                @click="hold"
+                            >
+                                <iconpark-icon
+                                    name="keepHold-baochi"
+                                ></iconpark-icon>
+                                <div class="text">{{$t('message.hold')}}</div>
+                            </div>
+                            <div
+                                v-else
+                                class="soft-function"
+                                :class="{unhold:statusIsHold}"
+                                @click="unhold"
+                            >
+                                <iconpark-icon
+                                    name="takeBack-jiehui"
+                                ></iconpark-icon>
+                                <div class="text">
+                                    {{$t('message.retrieve')}}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div
+                            v-if="(statusIsring || statusIsCall)"
+                            class="soft-function"
+                            :class="{disabled:!(statusIsring || statusIsCall)}"
+                            @click="hungup"
+                        >
+                            <iconpark-icon name="phone-off"></iconpark-icon>
+                            <div class="text">{{$t('message.hangUp')}}</div>
+                        </div>
+
+                        <div
+                            v-if="(statusIsring && 'inbound' === callDirection)"
+                            class="soft-function"
+                            :class="{disabled:!(statusIsring && 'inbound' === callDirection)}"
+                            @click="answer"
+                        >
+                            <iconpark-icon name="phone-call"></iconpark-icon>
+                            <div class="text">{{$t('message.answer')}}</div>
+                        </div>
+                    </div>
                 </div>
+            </el-card>
+
+            <el-card v-show="statusIsLogin" class="config">
+                <div v-if="latency_stat!=undefined">
+                    <el-row :gutter="20">
+                        {{$t('message.delay')}}:{{latency_stat.latencyTime}}ms.
+                        {{$t('message.packetLoss')}}:
+                        <iconpark-icon
+                            name="up-small"
+                            style="color: green"
+                        ></iconpark-icon>
+                        {{(latency_stat.upLossRate * 100).toFixed(2)}}% /
+                        <iconpark-icon
+                            name="down-small"
+                            style="color: red"
+                        ></iconpark-icon>
+                        {{(latency_stat.downLossRate * 100).toFixed(2)}}%
+                    </el-row>
+
+                    <el-row>
+                        <el-col :span="1">
+                            <iconpark-icon name="microphone"></iconpark-icon>
+                        </el-col>
+                        <el-col :span="23">
+                            <el-progress
+                                :stroke-width="24"
+                                :percentage="latency_stat.upAudioLevel*100"
+                                color="green"
+                                :show-text="false"
+                            ></el-progress>
+                        </el-col>
+                    </el-row>
+
+                    <el-row style="padding-top: 2px">
+                        <el-col :span="1">
+                            <iconpark-icon
+                                name="cancelMute-quxiaojingyin"
+                            ></iconpark-icon>
+                        </el-col>
+                        <el-col :span="23">
+                            <el-progress
+                                :stroke-width="24"
+                                :percentage="latency_stat.downAudioLevel*100"
+                                color="red"
+                                :show-text="false"
+                            ></el-progress>
+                        </el-col>
+                    </el-row>
+                </div>
+                <div v-if="callEndInfo!== undefined">
+                    <span v-if="callEndInfo.answered"
+                        ><el-tag type="success"
+                            >{{$t('message.connected')}}</el-tag
+                        ></span
+                    >
+                    <span v-if="!callEndInfo.answered"
+                        ><el-tag type="danger"
+                            >{{$t('message.notConnected')}}</el-tag
+                        ></span
+                    >
+                    <span v-if="callEndInfo.originator==='remote'"
+                        ><el-tag type="warning"
+                            >{{$t('message.partyHungUp')}}</el-tag
+                        ></span
+                    >
+                    <span v-if="callEndInfo.originator==='local'"
+                        ><el-tag type="success"
+                            >{{$t('message.selfInitiatedHangUp')}}</el-tag
+                        ></span
+                    >
+                    <span v-if="!callEndInfo.answered"
+                        ><strong>{{$t('message.hangUpReason')}}:</strong
+                        >{{callEndInfo.code}} {{callEndInfo.cause}}</span
+                    >
+                    <br />
+                </div>
+                <div style="padding-top: 5px">
+                    <el-input
+                        v-model="callPhoneNumber"
+                        :placeholder="$t('message.pleaseEnterTheOutboundNumber')"
+                    ></el-input>
+                </div>
+                <div style="margin-top: 5px">
+                    <div style="display: flex; width: 100%">
+                        <div style="width: 75%">
+                            <div style="display: flex; height: 50px">
+                                <div
+                                    class="number-card-button"
+                                    @click="pressNumber('1')"
+                                >
+                                    1
+                                </div>
+                                <div
+                                    class="number-card-button"
+                                    @click="pressNumber('2')"
+                                >
+                                    2
+                                </div>
+                                <div
+                                    class="number-card-button"
+                                    @click="pressNumber('3')"
+                                >
+                                    3
+                                </div>
+                            </div>
+                            <div style="display: flex; height: 50px">
+                                <div
+                                    class="number-card-button"
+                                    @click="pressNumber('4')"
+                                >
+                                    4
+                                </div>
+                                <div
+                                    class="number-card-button"
+                                    @click="pressNumber('5')"
+                                >
+                                    5
+                                </div>
+                                <div
+                                    class="number-card-button"
+                                    @click="pressNumber('6')"
+                                >
+                                    6
+                                </div>
+                            </div>
+                        </div>
+                        <div
+                            style="width: 25%; height: 100px; margin-left: 5px"
+                        >
+                            <el-button
+                                class="number-op"
+                                :disabled="!statusIsLogin || statusIsring || statusIsCall"
+                                type="primary"
+                                @click="makeCall"
+                            >
+                                <iconpark-icon
+                                    name="phone-telephone"
+                                ></iconpark-icon>
+                            </el-button>
+                        </div>
+                    </div>
+                    <div style="display: flex; width: 100%">
+                        <div style="width: 75%">
+                            <div style="display: flex; height: 50px">
+                                <div
+                                    class="number-card-button"
+                                    @click="pressNumber('7')"
+                                >
+                                    7
+                                </div>
+                                <div
+                                    class="number-card-button"
+                                    @click="pressNumber('8')"
+                                >
+                                    8
+                                </div>
+                                <div
+                                    class="number-card-button"
+                                    @click="pressNumber('9')"
+                                >
+                                    9
+                                </div>
+                            </div>
+                            <div style="display: flex; height: 50px">
+                                <div
+                                    class="number-card-button"
+                                    @click="pressNumber('*')"
+                                >
+                                    *
+                                </div>
+                                <div
+                                    class="number-card-button"
+                                    @click="pressNumber('0')"
+                                >
+                                    0
+                                </div>
+                                <div
+                                    class="number-card-button"
+                                    @click="pressNumber('#')"
+                                >
+                                    #
+                                </div>
+                            </div>
+                        </div>
+                        <div
+                            style="width: 25%; height: 100px; margin-left: 5px"
+                        >
+                            <el-button
+                                class="number-op"
+                                type="info"
+                                @click="backspaceNumber()"
+                            >
+                                <iconpark-icon
+                                    name="delete-two"
+                                ></iconpark-icon>
+                            </el-button>
+                        </div>
+                    </div>
+                </div>
+            </el-card>
+
+            <el-tabs
+                v-show="!statusIsLogin"
+                class="config"
+                type="border-card"
+                v-model="activeTabName"
+            >
+                <el-tab-pane
+                    :label="$t('message.ParameterSetting')"
+                    name="base"
+                >
+                    <div>
+                        <el-form
+                            ref="form"
+                            size="mini"
+                            label-position="left"
+                            label-width="100px"
+                        >
+                            <el-form-item :label="$t('message.serverAddress')">
+                                <el-input
+                                    type="text"
+                                    v-model="configuration.host"
+                                    clearable
+                                />
+                            </el-form-item>
+                            <el-form-item :label="$t('message.serverPort')">
+                                <el-input
+                                    type="text"
+                                    v-model="configuration.port"
+                                    maxlength="5"
+                                    clearable
+                                />
+                            </el-form-item>
+
+                            <el-form-item
+                                :label="$t('message.extensionNumber')"
+                            >
+                                <el-input
+                                    type="text"
+                                    v-model="configuration.extNo"
+                                    clearable
+                                />
+                            </el-form-item>
+                            <el-form-item :label="$t('message.password')">
+                                <el-input
+                                    type="password"
+                                    v-model="configuration.extPwd"
+                                    clearable
+                                    show-password
+                                />
+                            </el-form-item>
+
+                            <el-form-item :label="$t('message.autoAnswer')">
+                                <el-switch
+                                    v-model="autoAnswer"
+                                    active-color="#13ce66"
+                                    inactive-color="#666666"
+                                ></el-switch>
+                            </el-form-item>
+
+                            <el-collapse>
+                                <el-collapse-item
+                                    :title="$t('message.advancedSetting')"
+                                >
+                                    <el-form-item label="Language">
+                                        <el-select
+                                            v-model="locale"
+                                            @change="chooseLanguage"
+                                        >
+                                            <el-option
+                                                v-for="item in locales"
+                                                :key="item.value"
+                                                :label="item.label"
+                                                :value="item.value"
+                                            >
+                                            </el-option>
+                                        </el-select>
+                                    </el-form-item>
+                                    <el-form-item label="SSL">
+                                        <el-switch
+                                            v-model="configuration.proto"
+                                        />
+                                    </el-form-item>
+                                    <el-form-item label="Domain">
+                                        <el-input
+                                            type="text"
+                                            v-model="configuration.domain"
+                                            placeholder="选填"
+                                            clearable
+                                        />
+                                    </el-form-item>
+                                    <el-form-item label="IceType">
+                                        <el-radio-group
+                                            v-model="configuration.stun.type"
+                                        >
+                                            <el-radio label="stun"
+                                                >STUN</el-radio
+                                            >
+                                            <el-radio label="turn"
+                                                >TURN</el-radio
+                                            >
+                                        </el-radio-group>
+                                    </el-form-item>
+                                    <el-form-item label="IceHost">
+                                        <el-input
+                                            type="text"
+                                            v-model="configuration.stun.host"
+                                            clearable
+                                        />
+                                    </el-form-item>
+                                    <el-form-item
+                                        v-if="configuration.stun.type==='turn'"
+                                        label="username"
+                                    >
+                                        <el-input
+                                            type="text"
+                                            v-model="configuration.stun.username"
+                                            clearable
+                                        />
+                                    </el-form-item>
+                                    <el-form-item
+                                        v-if="configuration.stun.type==='turn'"
+                                        label="credential"
+                                    >
+                                        <el-input
+                                            type="password"
+                                            v-model="configuration.stun.password"
+                                            clearable
+                                            show-password
+                                        />
+                                    </el-form-item>
+                                    <el-form-item
+                                        :label="$t('message.autoMute')"
+                                    >
+                                        <el-switch
+                                            v-model="autoDisableMic"
+                                            active-color="#13ce66"
+                                            inactive-color="#666666"
+                                        ></el-switch>
+                                    </el-form-item>
+                                </el-collapse-item>
+                            </el-collapse>
+                        </el-form>
+                    </div>
+
+                    <div v-if="historyAccounts.length>0">
+                        <el-divider content-position="left"
+                            >{{$t("message.historicalAccountNumber")}}</el-divider
+                        >
+                        <div>
+                            <el-table
+                                :data="historyAccounts"
+                                stripe
+                                style="width: 100%"
+                                size="mini"
+                                :show-header="false"
+                            >
+                                <el-table-column type="expand" width="15">
+                                    <template slot-scope="props">
+                                        <el-descriptions
+                                            :column="1"
+                                            size="mini"
+                                            border
+                                        >
+                                            <el-descriptions-item
+                                                :label="$t('message.serverAddress')"
+                                                >{{ props.row.host }}:{{
+                                                props.row.port }}
+                                            </el-descriptions-item>
+                                            <el-descriptions-item
+                                                :label="$t('message.extensionNumber')"
+                                                >{{ props.row.extNo }}
+                                            </el-descriptions-item>
+                                            <el-descriptions-item
+                                                :label="$t('message.password')"
+                                                >{{ props.row.extPwd }}
+                                            </el-descriptions-item>
+                                        </el-descriptions>
+                                    </template>
+                                </el-table-column>
+                                <el-table-column label="SERVER">
+                                    <template slot-scope="scope">
+                                        <span style="font-size: 14px"
+                                            >{{ scope.row.extNo }}@{{
+                                            scope.row.host }}:{{ scope.row.port
+                                            }}</span
+                                        >
+                                    </template>
+                                </el-table-column>
+                                <el-table-column label="操作" width="136">
+                                    <template slot-scope="scope">
+                                        <el-button-group>
+                                            <el-button
+                                                size="mini"
+                                                type="primary"
+                                                :disabled="statusIsLogin"
+                                                @click="useHistoryAccounts(scope.row.host+scope.row.extNo)"
+                                            >
+                                                {{$t("message.use")}}
+                                            </el-button>
+                                            <el-button
+                                                size="mini"
+                                                type="danger"
+                                                :disabled="statusIsLogin"
+                                                @click="accountDel(scope.row.host+scope.row.extNo)"
+                                            >
+                                                {{$t("message.delete")}}
+                                            </el-button>
+                                        </el-button-group>
+                                    </template>
+                                </el-table-column>
+                            </el-table>
+                        </div>
+                    </div>
+                </el-tab-pane>
+
+                <el-tab-pane
+                    :label="$t('message.DebuggingInformation')"
+                    name="test"
+                >
+                    <el-divider content-position="left"
+                        >{{$t('message.equipmentList')}}</el-divider
+                    >
+                    <li v-for="(device,index) in mediaDevices">
+                        {{ device.kind.replace("audio", "") }}-{{ device.label
+                        }}
+                    </li>
+
+                    <el-divider content-position="left"
+                        >{{$t('message.microphoneTest')}}</el-divider
+                    >
+
+                    <el-row>
+                        <el-col :span="16">
+                            <el-progress
+                                :text-inside="true"
+                                :stroke-width="24"
+                                :percentage="testMicrophoneVolume"
+                                status="success"
+                            ></el-progress>
+                        </el-col>
+                        <el-col :span="8">
+                            <el-button
+                                size="mini"
+                                type="danger"
+                                round
+                                v-if="testMicrophoneOb"
+                                @click="testMicrophoneHandelStop"
+                            >
+                                {{ $t('message.endTesting')}}
+                            </el-button>
+                            <el-button
+                                size="mini"
+                                type="success"
+                                round
+                                v-else
+                                @click="testMicrophoneHandelStart"
+                            >
+                                {{$t('message.startTesting')}}
+                            </el-button>
+                        </el-col>
+                    </el-row>
+
+                    <el-divider content-position="left"
+                        >{{$t('message.headphoneTest')}}</el-divider
+                    >
+                    <audio
+                        style="height: 30px"
+                        controls=""
+                        :loop="false"
+                        :autoplay="false"
+                        src="https://web.sdk.qcloud.com/trtc/webrtc/assets/testspeak.mp3"
+                    ></audio>
+                </el-tab-pane>
+            </el-tabs>
+
+            <div id="footer">
+                Power By
+                <a target="_blank" href="https://github.com/xsdhy/softphone"
+                    >xsdhy</a
+                >
             </div>
-
-        </el-tab-pane>
-
-        <el-tab-pane :label="$t('message.DebuggingInformation')" name="test">
-            <el-divider content-position="left">{{$t('message.equipmentList')}}</el-divider>
-            <li v-for="(device,index) in mediaDevices">
-                {{ device.kind.replace("audio", "") }}-{{ device.label }}
-            </li>
-
-            <el-divider content-position="left">{{$t('message.microphoneTest')}}</el-divider>
-
-            <el-row>
-                <el-col :span="16">
-                    <el-progress :text-inside="true" :stroke-width="24" :percentage="testMicrophoneVolume"
-                                 status="success"></el-progress>
-                </el-col>
-                <el-col :span="8">
-                    <el-button size="mini" type="danger" round v-if="testMicrophoneOb"
-                               @click="testMicrophoneHandelStop">
-                        {{ $t('message.endTesting')}}
-                    </el-button>
-                    <el-button size="mini" type="success" round v-else @click="testMicrophoneHandelStart">
-                        {{$t('message.startTesting')}}
-                    </el-button>
-                </el-col>
-            </el-row>
-
-            <el-divider content-position="left">{{$t('message.headphoneTest')}}</el-divider>
-            <audio style="height: 30px" controls="" :loop="false" :autoplay="false"
-                   src="https://web.sdk.qcloud.com/trtc/webrtc/assets/testspeak.mp3"></audio>
-
-
-        </el-tab-pane>
-
-    </el-tabs>
-
-
-    <div id="footer">Power By <a target="_blank" href="https://github.com/xsdhy/softphone">xsdhy</a></div>
-</div>
-</body>
-<script>
-    //移动设备打开调试
-    const device = navigator.userAgent
-    if (device.indexOf('Android') > -1 || device.indexOf('iPhone') > -1 || device.indexOf('iPad') > -1 || device.indexOf('ios') > -1) {
-        var vConsole = new VConsole();
-    }
-
-    const messages = {
-        zh: {
-            message: {
-                login: '登录',
-                answer: '接听',
-                hangUp: '挂断',
-                hold: '保持',
-                retrieve: '取回',
-                transfer: '转接',
-                landing: '登陆中',
-                logout: '退出',
-                online: '在线',
-                number: '号码',
-                duration: '时长',
-                NotLoggedIn: '未登录',
-                ParameterSetting: '参数设置',
-                serverAddress: '服务器地址',
-                serverPort: '服务器端口',
-                extensionNumber: '分机号',
-                password: '密码',
-                share: '分享',
-                advancedSetting: '高级设置',
-                historicalAccountNumber: '历史账号',
-                use: '使用',
-                delete: '删除',
-                DebuggingInformation: '调试信息',
-                equipmentList: '设备列表',
-                microphoneTest: '麦克风测试',
-                startTesting: '开始测试',
-                endTesting: '结束测试',
-                headphoneTest: '耳机测试',
-                pleaseEnterTheOutboundNumber: '请输入外呼号码',
-                noAccountInformationWasEntered: '请先在参数配置中输入账号信息',
-                theCalledWasNotEntered: '请输入要拨打的号码',
-                connected: '已接通',
-                notConnected: '未接通',
-                partyHungUp: '对方挂断',
-                selfInitiatedHangUp: '主动挂断',
-                hangUpReason: '挂机原因',
-                delay: '延迟',
-                packetLoss: '丢包',
-                enable: '启用',
-                mute: '静音',
-                autoAnswer: '自动应答',
-                autoMute: '自动静音',
-            }
-        },
-        en: {
-            message: {
-                login: 'Login',
-                answer: 'Answer',
-                hangUp: 'HangUp',
-                hold: 'Hold',
-                retrieve: 'Retrieve',
-                transfer: 'Transfer',
-                landing: 'Landing',
-                logout: 'Logout',
-                online: 'Online',
-                number: 'Number',
-                duration: 'Duration',
-                NotLoggedIn: 'Unregistered',
-                ParameterSetting: 'ParameterSetting',
-                serverAddress: 'ServerAddr',
-                serverPort: 'ServerPort',
-                extensionNumber: 'ExtNumber',
-                password: 'Password',
-                share: 'Share',
-                advancedSetting: 'AdvancedSetting',
-                historicalAccountNumber: 'Historical Account Number',
-                use: 'Use',
-                delete: 'Del',
-                DebuggingInformation: 'DebuggingInformation',
-                equipmentList: 'Device List',
-                microphoneTest: 'Microphone Test',
-                startTesting: 'StartTesting',
-                endTesting: 'EndTheTest',
-                headphoneTest: 'Headset Test',
-                pleaseEnterTheOutboundNumber: 'Please Enter The Outbound Number',
-                noAccountInformationWasEntered: 'Enter the account information in the parameter configuration first',
-                theCalledWasNotEntered: 'Please enter the number you want to dial',
-                connected: 'Connected',
-                notConnected: 'Not Connected',
-                partyHungUp: 'Other Party Hung Up',
-                selfInitiatedHangUp: 'Self-Initiated Hang Up',
-                hangUpReason: 'Hang Up Reason',
-                delay: 'Delay',
-                packetLoss: 'Packet Loss',
-                enable: 'Enable',
-                mute: 'Mute',
-                autoAnswer: 'Auto Answer',
-                autoMute: 'Auto Mute',
-            }
-        },
-        pt: {
-            message: {
-                login: 'Entrar',
-                answer: 'Atender',
-                hangUp: 'Desligar',
-                hold: 'Aguardar',
-                retrieve: 'Recuperar',
-                transfer: 'Transferir',
-                landing: 'Conectando',
-                logout: 'Sair',
-                online: 'Online',
-                number: 'Número',
-                duration: 'Duração',
-                NotLoggedIn: 'Não Registrado',
-                ParameterSetting: 'Configuração de Parâmetros',
-                serverAddress: 'Endereço do Servidor',
-                serverPort: 'Porta do Servidor',
-                extensionNumber: 'Número de Extensão',
-                password: 'Senha',
-                share: 'Compartilhar',
-                advancedSetting: 'Configurações Avançadas',
-                historicalAccountNumber: 'Número da Conta Histórica',
-                use: 'Usar',
-                delete: 'Deletar',
-                DebuggingInformation: 'Informações de Depuração',
-                equipmentList: 'Lista de Equipamentos',
-                microphoneTest: 'Teste de Microfone',
-                startTesting: 'Iniciar Teste',
-                endTesting: 'Finalizar Teste',
-                headphoneTest: 'Teste de Fone de Ouvido',
-                pleaseEnterTheOutboundNumber: 'Por favor, insira o número de saída',
-                noAccountInformationWasEntered: 'Insira as informações da conta na configuração de parâmetros primeiro',
-                theCalledWasNotEntered: 'Por favor, insira o número a ser discado',
-                connected: 'Conectado',
-                notConnected: 'Não Conectado',
-                partyHungUp: 'A outra parte desligou',
-                selfInitiatedHangUp: 'Desligamento iniciado por si',
-                hangUpReason: 'Motivo do desligamento',
-                delay: 'Atraso',
-                packetLoss: 'Perda de pacote',
-                enable: 'Ativar',
-                mute: 'Mudo',
-                autoAnswer: 'Atendimento Automático',
-                autoMute: 'Mudo Automático',
-            }
-        },
-        es: {
-            message: {
-                login: 'Iniciar sesión',
-                answer: 'Responder',
-                hangUp: 'Colgar',
-                hold: 'Esperar',
-                retrieve: 'Recuperar',
-                transfer: 'Transferir',
-                landing: 'Conectando',
-                logout: 'Cerrar sesión',
-                online: 'En línea',
-                number: 'Número',
-                duration: 'Duración',
-                NotLoggedIn: 'No Registrado',
-                ParameterSetting: 'Configuración de Parámetros',
-                serverAddress: 'Dirección del Servidor',
-                serverPort: 'Puerto del Servidor',
-                extensionNumber: 'Número de Extensión',
-                password: 'Contraseña',
-                share: 'Compartir',
-                advancedSetting: 'Configuración Avanzada',
-                historicalAccountNumber: 'Número de Cuenta Histórica',
-                use: 'Usar',
-                delete: 'Eliminar',
-                DebuggingInformation: 'Información de Depuración',
-                equipmentList: 'Lista de Equipos',
-                microphoneTest: 'Prueba de Micrófono',
-                startTesting: 'Iniciar Prueba',
-                endTesting: 'Finalizar Prueba',
-                headphoneTest: 'Prueba de Auriculares',
-                pleaseEnterTheOutboundNumber: 'Por favor, ingrese el número de salida',
-                noAccountInformationWasEntered: 'Ingrese primero la información de la cuenta en la configuración de parámetros',
-                theCalledWasNotEntered: 'Por favor, ingrese el número a llamar',
-                connected: 'Conectado',
-                notConnected: 'No Conectado',
-                partyHungUp: 'La otra parte colgó',
-                selfInitiatedHangUp: 'Colgado por iniciativa propia',
-                hangUpReason: 'Razón de colgar',
-                delay: 'Retraso',
-                packetLoss: 'Pérdida de paquete',
-                enable: 'Habilitar',
-                mute: 'Silenciar',
-                autoAnswer: 'Respuesta Automática',
-                autoMute: 'Silencio Automático',
-            }
-        },
-    }
-    // 通过选项创建 VueI18n 实例
-    const i18n = new VueI18n({
-        locale: 'zh', // 设置地区
-        messages, // 设置地区信息
-    })
-
-    const storage = {
-        get(key) {
-            return JSON.parse(localStorage.getItem(key) || '[]');
-        },
-        set(key, value) {
-            localStorage.setItem(key, JSON.stringify(value));
+        </div>
+    </body>
+    <script>
+        //移动设备打开调试
+        const device = navigator.userAgent;
+        if (
+            device.indexOf("Android") > -1 ||
+            device.indexOf("iPhone") > -1 ||
+            device.indexOf("iPad") > -1 ||
+            device.indexOf("ios") > -1
+        ) {
+            var vConsole = new VConsole();
         }
-    };
 
-
-    new Vue({
-        el: '#app',
-        i18n,
-        data() {
-            return {
-                activeTabName: "base",
-                configuration: {
-                    host: '',
-                    port: '',
-                    domain: '',
-                    proto: true,
-                    extNo: '',
-                    extPwd: '',
-                    stun: {
-                        type: "stun",
-                        host: "",
-                        username: '',
-                        password: '',
-                    },
-                    checkMic: true,
-                    autoRegister: false,
-                    debug: false,
-                    stateEventListener: this.stateEventListener
+        const messages = {
+            zh: {
+                message: {
+                    login: "登录",
+                    answer: "接听",
+                    hangUp: "挂断",
+                    hold: "保持",
+                    retrieve: "取回",
+                    transfer: "转接",
+                    landing: "登陆中",
+                    logout: "退出",
+                    online: "在线",
+                    number: "号码",
+                    duration: "时长",
+                    NotLoggedIn: "未登录",
+                    ParameterSetting: "参数设置",
+                    serverAddress: "服务器地址",
+                    serverPort: "服务器端口",
+                    extensionNumber: "分机号",
+                    password: "密码",
+                    share: "分享",
+                    advancedSetting: "高级设置",
+                    historicalAccountNumber: "历史账号",
+                    use: "使用",
+                    delete: "删除",
+                    DebuggingInformation: "调试信息",
+                    equipmentList: "设备列表",
+                    microphoneTest: "麦克风测试",
+                    startTesting: "开始测试",
+                    endTesting: "结束测试",
+                    headphoneTest: "耳机测试",
+                    pleaseEnterTheOutboundNumber: "请输入外呼号码",
+                    noAccountInformationWasEntered:
+                        "请先在参数配置中输入账号信息",
+                    theCalledWasNotEntered: "请输入要拨打的号码",
+                    connected: "已接通",
+                    notConnected: "未接通",
+                    partyHungUp: "对方挂断",
+                    selfInitiatedHangUp: "主动挂断",
+                    hangUpReason: "挂机原因",
+                    delay: "延迟",
+                    packetLoss: "丢包",
+                    enable: "启用",
+                    mute: "静音",
+                    autoAnswer: "自动应答",
+                    autoMute: "自动静音",
                 },
+            },
+            en: {
+                message: {
+                    login: "Login",
+                    answer: "Answer",
+                    hangUp: "HangUp",
+                    hold: "Hold",
+                    retrieve: "Retrieve",
+                    transfer: "Transfer",
+                    landing: "Landing",
+                    logout: "Logout",
+                    online: "Online",
+                    number: "Number",
+                    duration: "Duration",
+                    NotLoggedIn: "Unregistered",
+                    ParameterSetting: "ParameterSetting",
+                    serverAddress: "ServerAddr",
+                    serverPort: "ServerPort",
+                    extensionNumber: "ExtNumber",
+                    password: "Password",
+                    share: "Share",
+                    advancedSetting: "AdvancedSetting",
+                    historicalAccountNumber: "Historical Account Number",
+                    use: "Use",
+                    delete: "Del",
+                    DebuggingInformation: "DebuggingInformation",
+                    equipmentList: "Device List",
+                    microphoneTest: "Microphone Test",
+                    startTesting: "StartTesting",
+                    endTesting: "EndTheTest",
+                    headphoneTest: "Headset Test",
+                    pleaseEnterTheOutboundNumber:
+                        "Please Enter The Outbound Number",
+                    noAccountInformationWasEntered:
+                        "Enter the account information in the parameter configuration first",
+                    theCalledWasNotEntered:
+                        "Please enter the number you want to dial",
+                    connected: "Connected",
+                    notConnected: "Not Connected",
+                    partyHungUp: "Other Party Hung Up",
+                    selfInitiatedHangUp: "Self-Initiated Hang Up",
+                    hangUpReason: "Hang Up Reason",
+                    delay: "Delay",
+                    packetLoss: "Packet Loss",
+                    enable: "Enable",
+                    mute: "Mute",
+                    autoAnswer: "Auto Answer",
+                    autoMute: "Auto Mute",
+                },
+            },
+            pt: {
+                message: {
+                    login: "Entrar",
+                    answer: "Atender",
+                    hangUp: "Desligar",
+                    hold: "Aguardar",
+                    retrieve: "Recuperar",
+                    transfer: "Transferir",
+                    landing: "Conectando",
+                    logout: "Sair",
+                    online: "Online",
+                    number: "Número",
+                    duration: "Duração",
+                    NotLoggedIn: "Não Registrado",
+                    ParameterSetting: "Configuração de Parâmetros",
+                    serverAddress: "Endereço do Servidor",
+                    serverPort: "Porta do Servidor",
+                    extensionNumber: "Número de Extensão",
+                    password: "Senha",
+                    share: "Compartilhar",
+                    advancedSetting: "Configurações Avançadas",
+                    historicalAccountNumber: "Número da Conta Histórica",
+                    use: "Usar",
+                    delete: "Deletar",
+                    DebuggingInformation: "Informações de Depuração",
+                    equipmentList: "Lista de Equipamentos",
+                    microphoneTest: "Teste de Microfone",
+                    startTesting: "Iniciar Teste",
+                    endTesting: "Finalizar Teste",
+                    headphoneTest: "Teste de Fone de Ouvido",
+                    pleaseEnterTheOutboundNumber:
+                        "Por favor, insira o número de saída",
+                    noAccountInformationWasEntered:
+                        "Insira as informações da conta na configuração de parâmetros primeiro",
+                    theCalledWasNotEntered:
+                        "Por favor, insira o número a ser discado",
+                    connected: "Conectado",
+                    notConnected: "Não Conectado",
+                    partyHungUp: "A outra parte desligou",
+                    selfInitiatedHangUp: "Desligamento iniciado por si",
+                    hangUpReason: "Motivo do desligamento",
+                    delay: "Atraso",
+                    packetLoss: "Perda de pacote",
+                    enable: "Ativar",
+                    mute: "Mudo",
+                    autoAnswer: "Atendimento Automático",
+                    autoMute: "Mudo Automático",
+                },
+            },
+            es: {
+                message: {
+                    login: "Iniciar sesión",
+                    answer: "Responder",
+                    hangUp: "Colgar",
+                    hold: "Esperar",
+                    retrieve: "Recuperar",
+                    transfer: "Transferir",
+                    landing: "Conectando",
+                    logout: "Cerrar sesión",
+                    online: "En línea",
+                    number: "Número",
+                    duration: "Duración",
+                    NotLoggedIn: "No Registrado",
+                    ParameterSetting: "Configuración de Parámetros",
+                    serverAddress: "Dirección del Servidor",
+                    serverPort: "Puerto del Servidor",
+                    extensionNumber: "Número de Extensión",
+                    password: "Contraseña",
+                    share: "Compartir",
+                    advancedSetting: "Configuración Avanzada",
+                    historicalAccountNumber: "Número de Cuenta Histórica",
+                    use: "Usar",
+                    delete: "Eliminar",
+                    DebuggingInformation: "Información de Depuración",
+                    equipmentList: "Lista de Equipos",
+                    microphoneTest: "Prueba de Micrófono",
+                    startTesting: "Iniciar Prueba",
+                    endTesting: "Finalizar Prueba",
+                    headphoneTest: "Prueba de Auriculares",
+                    pleaseEnterTheOutboundNumber:
+                        "Por favor, ingrese el número de salida",
+                    noAccountInformationWasEntered:
+                        "Ingrese primero la información de la cuenta en la configuración de parámetros",
+                    theCalledWasNotEntered:
+                        "Por favor, ingrese el número a llamar",
+                    connected: "Conectado",
+                    notConnected: "No Conectado",
+                    partyHungUp: "La otra parte colgó",
+                    selfInitiatedHangUp: "Colgado por iniciativa propia",
+                    hangUpReason: "Razón de colgar",
+                    delay: "Retraso",
+                    packetLoss: "Pérdida de paquete",
+                    enable: "Habilitar",
+                    mute: "Silenciar",
+                    autoAnswer: "Respuesta Automática",
+                    autoMute: "Silencio Automático",
+                },
+            },
+        };
+        // 通过选项创建 VueI18n 实例
+        const i18n = new VueI18n({
+            locale: "zh", // 设置地区
+            messages, // 设置地区信息
+        });
 
-                statusIsLogin: false,//是否登陆
-                statusIsring: false,//是否在振铃中
-                statusIsCall: false,//是否在拨打中
-                statusIsHold: false,//是否在保持中
+        const storage = {
+            get(key) {
+                return JSON.parse(localStorage.getItem(key) || "[]");
+            },
+            set(key, value) {
+                localStorage.setItem(key, JSON.stringify(value));
+            },
+        };
 
-                callDirection: '',//呼叫方向
+        new Vue({
+            el: "#app",
+            i18n,
+            data() {
+                return {
+                    activeTabName: "base",
+                    configuration: {
+                        host: "",
+                        port: "",
+                        domain: "",
+                        proto: true,
+                        extNo: "",
+                        extPwd: "",
+                        stun: {
+                            type: "stun",
+                            host: "",
+                            username: "",
+                            password: "",
+                        },
+                        checkMic: true,
+                        autoRegister: false,
+                        debug: false,
+                        stateEventListener: this.stateEventListener,
+                    },
 
-                agentNo: "",//分机号
-                discaller: "",//主叫号码
-                discallee: "",//被叫号码
-                callPhoneNumber: "",//呼出号码
+                    statusIsLogin: false, //是否登陆
+                    statusIsring: false, //是否在振铃中
+                    statusIsCall: false, //是否在拨打中
+                    statusIsHold: false, //是否在保持中
 
-                durtime: 0,//计时器
-                callTime: '00:00:00',//计时器-格式化
-                callTimeInter: null,//计时器-定时器,
+                    callDirection: "", //呼叫方向
 
-                historyAccounts: [],//历史账号列表
-                lastAccount: "",//最后一次使用的账号配置
+                    agentNo: "", //分机号
+                    discaller: "", //主叫号码
+                    discallee: "", //被叫号码
+                    callPhoneNumber: "", //呼出号码
 
-                networkSpeed: 0,//网速
-                testMicrophoneOb: null,
-                testMicrophoneVolume: 0,
-                mediaDevices: null,
+                    durtime: 0, //计时器
+                    callTime: "00:00:00", //计时器-格式化
+                    callTimeInter: null, //计时器-定时器,
 
-                latency_stat: undefined,
-                autoAnswer: false,//自动接听
-                autoDisableMic: false,//自动静音
-                disableMic: false,//静音
+                    historyAccounts: [], //历史账号列表
+                    lastAccount: "", //最后一次使用的账号配置
 
-                loading: null,
-                sipClient: undefined,
-                locale: 'zh',
-                locales: [
-                    {"label": "简体中文", "value": "zh"},
-                    {"label": "English", "value": "en"},
-                    {"label": "Spanish", "value": "es"},
-                    {"label": "Portuguese", "value": "pt"},
-                ],
-                callEndInfo: undefined,
+                    networkSpeed: 0, //网速
+                    testMicrophoneOb: null,
+                    testMicrophoneVolume: 0,
+                    mediaDevices: null,
 
-            }
-        },
-        created() {
-            console.log("v1.3.5.1");
+                    latency_stat: undefined,
+                    autoAnswer: false, //自动接听
+                    autoDisableMic: false, //自动静音
+                    disableMic: false, //静音
 
+                    loading: null,
+                    sipClient: undefined,
+                    locale: "zh",
+                    locales: [
+                        { label: "简体中文", value: "zh" },
+                        { label: "English", value: "en" },
+                        { label: "Spanish", value: "es" },
+                        { label: "Portuguese", value: "pt" },
+                    ],
+                    callEndInfo: undefined,
+                };
+            },
+            created() {
+                console.log("v1.3.5.1");
 
-            this.initHistoryAccounts();
-            this.callPhoneNumber = localStorage.getItem("callPhoneNumber")
+                this.initHistoryAccounts();
+                this.callPhoneNumber = localStorage.getItem("callPhoneNumber");
 
-            this.locale = this.getQueryVariable("l");
-            if (!this.locale) {
-                this.locale = localStorage.getItem("locale")
-            }
-            if (!this.locale) {
-                for (let i = 0; i < this.locales.length; i++) {
-                    if (navigator.language === this.locales[i].value) {
-                        this.locale = navigator.language
+                this.locale = this.getQueryVariable("l");
+                if (!this.locale) {
+                    this.locale = localStorage.getItem("locale");
+                }
+                if (!this.locale) {
+                    for (let i = 0; i < this.locales.length; i++) {
+                        if (navigator.language === this.locales[i].value) {
+                            this.locale = navigator.language;
+                        }
                     }
                 }
-            }
-            if (!this.locale) {
-                this.locale = "zh"
-            }
+                if (!this.locale) {
+                    this.locale = "zh";
+                }
 
-            localStorage.setItem("locale", this.locale)
-            i18n.locale = this.locale
-
-            SipCall.getMediaDeviceInfo().then((res) => {
-                this.mediaDevices = res;
-            });
-        },
-        methods: {
-            login() {
-                if (this.configuration.host.length <= 3 || this.configuration.extNo.length <= 3 || this.configuration.extPwd.length <= 3) {
-                    this.$message({
-                        message: this.$t('message.noAccountInformationWasEntered'),
-                        type: 'warning'
-                    });
-                    return;
-                }
-                this.saveHistoryAccounts();
-                this.loading = this.$loading({text: 'loading...'});
-                this.sipClient = new SipCall(this.configuration);
-            },
-            logout() {
-                console.log("点击退出按钮")
-                this.sipClient.unregister()
-            },
-            answer() {
-                console.log("点击应答按钮")
-                this.sipClient.answer()
-            },
-            hold() {
-                console.log("点击保持按钮")
-                this.sipClient.hold()
-            },
-            unhold() {
-                console.log("点击取消保持按钮")
-                this.sipClient.unhold()
-            },
-            makeCall() {
-                console.log("点击拨打按钮")
-                this.callEndInfo = undefined
-                if (this.callPhoneNumber.length <= 2) {
-                    this.$message({
-                        message: this.$t('message.theCalledWasNotEntered'),
-                        type: 'warning'
-                    });
-                    return
-                }
-                localStorage.setItem("callPhoneNumber", this.callPhoneNumber)
-                this.discallee = this.callPhoneNumber
-                let callId = this.sipClient.call(this.callPhoneNumber.trim());
-            },
-            hungup() {
-                console.log("点击挂断按钮");
-                this.sipClient.hangup()
-            },
-            //按键
-            pressNumber(tone) {
-                //在通话中就发送
-                if (this.statusIsCall) {
-                    this.sipClient.sendDtmf(tone);
-                    return
-                }
-                if (this.callPhoneNumber) {
-                    this.callPhoneNumber = this.callPhoneNumber + "" + tone
-                } else {
-                    this.callPhoneNumber = "" + tone
-                }
-            },
-            //退格
-            backspaceNumber() {
-                if (this.callPhoneNumber && this.callPhoneNumber.length > 0) {
-                    this.callPhoneNumber = this.callPhoneNumber.substring(0, this.callPhoneNumber.length - 1)
-                }
-            },
-            mute() {
-                if (this.disableMic) {
-                    this.sipClient.unmute();
-                } else {
-                    this.sipClient.mute();
-                }
-            },
-            //事件回调
-            stateEventListener(event, data) {
-                console.log("收到事件:", event, data);
-                switch (event) {
-                    case "DISCONNECTED":
-                        this.loading.close();
-                        this.$message({
-                            message: "DISCONNECTED",
-                            type: 'warning'
-                        });
-                        break;
-                    case "REGISTERED":
-                        this.statusIsLogin = true;
-                        this.agentNo = data.localAgent;
-                        break;
-                    case "UNREGISTERED":
-                        this.statusIsLogin = false;
-                        this.statusIsHold = false;
-                        this.statusIsring = false;
-                        this.statusIsCall = false;
-                        this.disableMic = false;
-                        this.latency_stat = undefined;
-                        this.callEndInfo = undefined;
-                        break;
-                    case "INCOMING_CALL":
-                        this.callEndInfo = undefined
-                        this.playRingMedia()
-                    case "OUTGOING_CALL":
-                        this.callEndInfo = undefined
-                        this.startTimerCall();
-                        this.playRingMedia();
-                        this.statusIsring = true;
-                        this.callDirection = data.direction;
-                        this.discaller = data.otherLegNumber;
-                        this.discallee = this.agentNo;
-                        if (this.autoAnswer) {
-                            //自动应答
-                            this.sipClient.answer();
-                        }
-                        break;
-                    case "IN_CALL":
-                        if (this.autoDisableMic) {
-                            //自动禁音
-                            this.sipClient.mute();
-                        }
-                        this.startTimerCall();
-                        this.stopPlayRingMedia();
-                        this.statusIsring = false;
-                        this.statusIsCall = true;
-                        this.statusIsHold = false;
-                        break;
-                    case "CALL_END":
-                        this.stopTimerCall();
-                        this.stopPlayRingMedia();
-                        this.statusIsring = false;
-                        this.statusIsCall = false;
-                        this.statusIsHold = false;
-                        this.disableMic = false;
-                        this.latency_stat = undefined;
-                        this.callEndInfo = data
-                        break;
-                    case "HOLD":
-                        this.statusIsHold = true;
-                        break;
-                    case "UNHOLD":
-                        this.statusIsHold = false;
-                        break;
-                    case "MUTE":
-                        this.disableMic = true;
-                        break;
-                    case "UNMUTE":
-                        this.disableMic = false;
-                        break;
-                    case "CONNECTED":
-                        //已连接
-                        this.loading.close();
-                        this.sipClient.register()
-                        break;
-                    case "DISCONNECT":
-                        console.log("DISCONNECT", data.msg)
-                        break;
-                    case "RECONNECT":
-                        break;
-                    case "REGISTER_FAILED":
-                        this.loading.close();
-                        this.$message.error(data.msg);
-                        break;
-                    case "LATENCY_STAT":
-                        this.latency_stat = data
-                        if (this.statusIsring && data.downAudioLevel>0){
-                            console.log("停止播放回铃音")
-                            this.stopPlayRingMedia()
-                        }
-                        break;
-                    case "MIC_ERROR":
-                        alert(data.msg);
-                        break;
-                    default:
-                }
-            },
-            //启动计时器
-            startTimerCall() {
-                if (this.callTimeInter) {
-                    clearInterval(this.callTimeInter);
-                    this.callTime = "00:00:00";
-                    this.durtime = 0;
-                }
-                this.callTimeInter = setInterval(() => {
-                    this.timerCall();
-                }, 1000)
-            },
-            //停止计时器
-            stopTimerCall() {
-                if (this.callTimeInter) {
-                    clearInterval(this.callTimeInter);
-                    this.callTime = "00:00:00";
-                    this.durtime = 0;
-                }
-            },
-            //计时器
-            timerCall() {
-                this.durtime++;
-                var sec = this.durtime % 60;
-                if (sec < 10) {
-                    sec = "0" + sec;
-                }
-                var min = Math.floor((this.durtime % (60 * 60)) / 60);
-                if (min < 10) {
-                    min = "0" + min;
-                }
-                var hour = Math.floor(this.durtime / (60 * 60));
-                if (hour < 10) {
-                    hour = "0" + hour;
-                }
-                this.callTime = hour + ":" + min + ":" + sec
-            },
-            //播放挂机铃声
-            playHangupMedia() {
-                let hangupAudio = document.getElementById("hangupMediaAudioId")
-                if (!hangupAudio) {
-                    hangupAudio = document.createElement('audio');
-                    hangupAudio.id = 'hangupMediaAudioId';
-                    hangupAudio.hidden = true;
-                    hangupAudio.src = './static/wav/hangup.wav'
-                    document.body.appendChild(hangupAudio);
-                }
-                hangupAudio.play();
-            },
-            //播放来电振铃
-            playRingMedia() {
-                if (window.electronAPI){
-                    window.electronAPI.createNotification("来电提醒","您有一通电话正在呼入")
-                }
-                this.stopPlayRingMedia();
-                let ringAudio = document.getElementById("ringMediaAudioId")
-                if (!ringAudio) {
-                    ringAudio = document.createElement('audio');
-                    ringAudio.id = 'ringMediaAudioId';
-                    ringAudio.hidden = true;
-                    ringAudio.src = './static/wav/ring.wav';
-                    ringAudio.loop = 'loop';
-                    document.body.appendChild(ringAudio);
-                }
-                ringAudio.play();
-            },
-            //停止播放来电振铃
-            stopPlayRingMedia() {
-                let ringAudio = document.getElementById("ringMediaAudioId");
-                if (ringAudio) {
-                    document.body.removeChild(ringAudio);
-                }
-            },
-
-            accountGetAll() {
-                this.historyAccounts = storage.get("historyAccounts");
-                return this.historyAccounts;
-            },
-            accountGet(accountKey) {
-                return this.accountGetAll().find(account => account.host + account.extNo === accountKey) || null;
-            },
-            accountDel(accountKey) {
-                const accounts = this.accountGetAll().filter(account => account.host + account.extNo !== accountKey);
-                storage.set("historyAccounts", accounts);
-                this.accountGetAll();
-            },
-            accountAdd(account) {
-                const accountKey = account.host + account.extNo;
-                if (this.accountGet(accountKey)) {
-                    this.accountEdit(accountKey, account);
-                    return;
-                }
-                const accounts = this.accountGetAll();
-                accounts.push(account);
-                storage.set("historyAccounts", accounts);
-                this.accountGetAll();
-            },
-            accountEdit(accountKey, account) {
-                this.accountDel(accountKey);
-                this.accountAdd(account);
-                this.accountGetAll();
-            },
-            useHistoryAccounts(accountKey) {
-                const item = this.accountGet(accountKey);
-                if (!item) return;
-                Object.assign(this.configuration, item);
-            },
-            initHistoryAccounts() {
-                const accounts = this.accountGetAll();
-                if (!accounts.length) return;
-
-                this.historyAccounts = accounts;
-                const lastAccount = localStorage.getItem("lastAccount");
-                this.useHistoryAccounts(lastAccount || (accounts[0].host + accounts[0].extNo));
-            },
-            saveHistoryAccounts() {
-                const accountKey = this.configuration.host + this.configuration.extNo;
-                this.accountEdit(accountKey, this.configuration);
-                localStorage.setItem("lastAccount", accountKey);
-            },
-
-            chooseLanguage(item) {
-                this.locale = item
-                localStorage.setItem("locale", this.locale)
+                localStorage.setItem("locale", this.locale);
                 i18n.locale = this.locale;
-            },
 
-            //麦克风音量检测-开始
-            testMicrophoneHandelStart() {
-                SipCall.testMicrophone((volume) => {
-                    this.testMicrophoneVolume = volume
-                }).then((res) => {
-                    this.testMicrophoneOb = res;
+                SipCall.getMediaDeviceInfo().then((res) => {
+                    this.mediaDevices = res;
                 });
             },
-            //麦克风音量检测-结束
-            testMicrophoneHandelStop() {
-                if (this.testMicrophoneOb) {
-                    this.testMicrophoneOb.yes();
-                    this.testMicrophoneVolume = 0;
-                    this.testMicrophoneOb = null;
-                }
-            },
-            //获取get参数
-            getQueryVariable(variable) {
-                let query = window.location.search.substring(1);
-                let vars = query.split("&");
-                for (let i = 0; i < vars.length; i++) {
-                    let pair = vars[i].split("=");
-                    if (pair[0] === variable) {
-                        return pair[1];
+            methods: {
+                login() {
+                    if (
+                        this.configuration.host.length <= 3 ||
+                        this.configuration.extNo.length <= 3 ||
+                        this.configuration.extPwd.length <= 3
+                    ) {
+                        this.$message({
+                            message: this.$t(
+                                "message.noAccountInformationWasEntered",
+                            ),
+                            type: "warning",
+                        });
+                        return;
                     }
-                }
-                return false;
-            }
-        }
-    });
-</script>
+                    this.saveHistoryAccounts();
+                    this.loading = this.$loading({ text: "loading..." });
+                    this.sipClient = new SipCall(this.configuration);
+                },
+                logout() {
+                    console.log("点击退出按钮");
+                    this.sipClient.unregister();
+                },
+                answer() {
+                    console.log("点击应答按钮");
+                    this.sipClient.answer();
+                },
+                hold() {
+                    console.log("点击保持按钮");
+                    this.sipClient.hold();
+                },
+                unhold() {
+                    console.log("点击取消保持按钮");
+                    this.sipClient.unhold();
+                },
+                makeCall() {
+                    console.log("点击拨打按钮");
+                    this.callEndInfo = undefined;
+                    if (this.callPhoneNumber.length <= 2) {
+                        this.$message({
+                            message: this.$t("message.theCalledWasNotEntered"),
+                            type: "warning",
+                        });
+                        return;
+                    }
+                    localStorage.setItem(
+                        "callPhoneNumber",
+                        this.callPhoneNumber,
+                    );
+                    this.discallee = this.callPhoneNumber;
+                    let callId = this.sipClient.call(
+                        this.callPhoneNumber.trim(),
+                    );
+                },
+                hungup() {
+                    console.log("点击挂断按钮");
+                    this.sipClient.hangup();
+                },
+                //按键
+                pressNumber(tone) {
+                    //在通话中就发送
+                    if (this.statusIsCall) {
+                        this.sipClient.sendDtmf(tone);
+                        return;
+                    }
+                    if (this.callPhoneNumber) {
+                        this.callPhoneNumber = this.callPhoneNumber + "" + tone;
+                    } else {
+                        this.callPhoneNumber = "" + tone;
+                    }
+                },
+                //退格
+                backspaceNumber() {
+                    if (
+                        this.callPhoneNumber &&
+                        this.callPhoneNumber.length > 0
+                    ) {
+                        this.callPhoneNumber = this.callPhoneNumber.substring(
+                            0,
+                            this.callPhoneNumber.length - 1,
+                        );
+                    }
+                },
+                mute() {
+                    if (this.disableMic) {
+                        this.sipClient.unmute();
+                    } else {
+                        this.sipClient.mute();
+                    }
+                },
+                //事件回调
+                stateEventListener(event, data) {
+                    console.log("收到事件:", event, data);
+                    switch (event) {
+                        case "DISCONNECTED":
+                            this.loading.close();
+                            this.$message({
+                                message: "DISCONNECTED",
+                                type: "warning",
+                            });
+                            break;
+                        case "REGISTERED":
+                            this.statusIsLogin = true;
+                            this.agentNo = data.localAgent;
+                            break;
+                        case "UNREGISTERED":
+                            this.statusIsLogin = false;
+                            this.statusIsHold = false;
+                            this.statusIsring = false;
+                            this.statusIsCall = false;
+                            this.disableMic = false;
+                            this.latency_stat = undefined;
+                            this.callEndInfo = undefined;
+                            break;
+                        case "INCOMING_CALL":
+                            this.callEndInfo = undefined;
+                        // this.playRingMedia();
+                        case "OUTGOING_CALL":
+                            this.callEndInfo = undefined;
+                            this.startTimerCall();
+                            // this.playRingMedia();
+                            this.statusIsring = true;
+                            this.callDirection = data.direction;
+                            this.discaller = data.otherLegNumber;
+                            this.discallee = this.agentNo;
+                            if (this.autoAnswer) {
+                                //自动应答
+                                this.sipClient.answer();
+                            }
+                            break;
+                        case "IN_CALL":
+                            if (this.autoDisableMic) {
+                                //自动禁音
+                                this.sipClient.mute();
+                            }
+                            this.startTimerCall();
+                            // this.stopPlayRingMedia();
+                            this.statusIsring = false;
+                            this.statusIsCall = true;
+                            this.statusIsHold = false;
+                            break;
+                        case "CALL_END":
+                            this.stopTimerCall();
+                            // this.stopPlayRingMedia();
+                            this.statusIsring = false;
+                            this.statusIsCall = false;
+                            this.statusIsHold = false;
+                            this.disableMic = false;
+                            this.latency_stat = undefined;
+                            this.callEndInfo = data;
+                            break;
+                        case "HOLD":
+                            this.statusIsHold = true;
+                            break;
+                        case "UNHOLD":
+                            this.statusIsHold = false;
+                            break;
+                        case "MUTE":
+                            this.disableMic = true;
+                            break;
+                        case "UNMUTE":
+                            this.disableMic = false;
+                            break;
+                        case "CONNECTED":
+                            //已连接
+                            this.loading.close();
+                            this.sipClient.register();
+                            break;
+                        case "DISCONNECT":
+                            console.log("DISCONNECT", data.msg);
+                            break;
+                        case "RECONNECT":
+                            break;
+                        case "REGISTER_FAILED":
+                            this.loading.close();
+                            this.$message.error(data.msg);
+                            break;
+                        case "LATENCY_STAT":
+                            this.latency_stat = data;
+                            if (this.statusIsring && data.downAudioLevel > 0) {
+                                console.log("停止播放回铃音");
+                                this.stopPlayRingMedia();
+                            }
+                            break;
+                        case "MIC_ERROR":
+                            alert(data.msg);
+                            break;
+                        default:
+                    }
+                },
+                //启动计时器
+                startTimerCall() {
+                    if (this.callTimeInter) {
+                        clearInterval(this.callTimeInter);
+                        this.callTime = "00:00:00";
+                        this.durtime = 0;
+                    }
+                    this.callTimeInter = setInterval(() => {
+                        this.timerCall();
+                    }, 1000);
+                },
+                //停止计时器
+                stopTimerCall() {
+                    if (this.callTimeInter) {
+                        clearInterval(this.callTimeInter);
+                        this.callTime = "00:00:00";
+                        this.durtime = 0;
+                    }
+                },
+                //计时器
+                timerCall() {
+                    this.durtime++;
+                    var sec = this.durtime % 60;
+                    if (sec < 10) {
+                        sec = "0" + sec;
+                    }
+                    var min = Math.floor((this.durtime % (60 * 60)) / 60);
+                    if (min < 10) {
+                        min = "0" + min;
+                    }
+                    var hour = Math.floor(this.durtime / (60 * 60));
+                    if (hour < 10) {
+                        hour = "0" + hour;
+                    }
+                    this.callTime = hour + ":" + min + ":" + sec;
+                },
+                //播放挂机铃声
+                playHangupMedia() {
+                    let hangupAudio =
+                        document.getElementById("hangupMediaAudioId");
+                    if (!hangupAudio) {
+                        hangupAudio = document.createElement("audio");
+                        hangupAudio.id = "hangupMediaAudioId";
+                        hangupAudio.hidden = true;
+                        hangupAudio.src = "./static/wav/hangup.wav";
+                        document.body.appendChild(hangupAudio);
+                    }
+                    hangupAudio.play();
+                },
+                //播放来电振铃
+                playRingMedia() {
+                    if (window.electronAPI) {
+                        window.electronAPI.createNotification(
+                            "来电提醒",
+                            "您有一通电话正在呼入",
+                        );
+                    }
+                    this.stopPlayRingMedia();
+                    let ringAudio = document.getElementById("ringMediaAudioId");
+                    if (!ringAudio) {
+                        ringAudio = document.createElement("audio");
+                        ringAudio.id = "ringMediaAudioId";
+                        ringAudio.hidden = true;
+                        ringAudio.src = "./static/wav/ring.wav";
+                        ringAudio.loop = "loop";
+                        document.body.appendChild(ringAudio);
+                    }
+                    ringAudio.play();
+                },
+                //停止播放来电振铃
+                stopPlayRingMedia() {
+                    let ringAudio = document.getElementById("ringMediaAudioId");
+                    if (ringAudio) {
+                        document.body.removeChild(ringAudio);
+                    }
+                },
+
+                accountGetAll() {
+                    this.historyAccounts = storage.get("historyAccounts");
+                    return this.historyAccounts;
+                },
+                accountGet(accountKey) {
+                    return (
+                        this.accountGetAll().find(
+                            (account) =>
+                                account.host + account.extNo === accountKey,
+                        ) || null
+                    );
+                },
+                accountDel(accountKey) {
+                    const accounts = this.accountGetAll().filter(
+                        (account) =>
+                            account.host + account.extNo !== accountKey,
+                    );
+                    storage.set("historyAccounts", accounts);
+                    this.accountGetAll();
+                },
+                accountAdd(account) {
+                    const accountKey = account.host + account.extNo;
+                    if (this.accountGet(accountKey)) {
+                        this.accountEdit(accountKey, account);
+                        return;
+                    }
+                    const accounts = this.accountGetAll();
+                    accounts.push(account);
+                    storage.set("historyAccounts", accounts);
+                    this.accountGetAll();
+                },
+                accountEdit(accountKey, account) {
+                    this.accountDel(accountKey);
+                    this.accountAdd(account);
+                    this.accountGetAll();
+                },
+                useHistoryAccounts(accountKey) {
+                    const item = this.accountGet(accountKey);
+                    if (!item) return;
+                    Object.assign(this.configuration, item);
+                },
+                initHistoryAccounts() {
+                    const accounts = this.accountGetAll();
+                    if (!accounts.length) return;
+
+                    this.historyAccounts = accounts;
+                    const lastAccount = localStorage.getItem("lastAccount");
+                    this.useHistoryAccounts(
+                        lastAccount || accounts[0].host + accounts[0].extNo,
+                    );
+                },
+                saveHistoryAccounts() {
+                    const accountKey =
+                        this.configuration.host + this.configuration.extNo;
+                    this.accountEdit(accountKey, this.configuration);
+                    localStorage.setItem("lastAccount", accountKey);
+                },
+
+                chooseLanguage(item) {
+                    this.locale = item;
+                    localStorage.setItem("locale", this.locale);
+                    i18n.locale = this.locale;
+                },
+
+                //麦克风音量检测-开始
+                testMicrophoneHandelStart() {
+                    SipCall.testMicrophone((volume) => {
+                        this.testMicrophoneVolume = volume;
+                    }).then((res) => {
+                        this.testMicrophoneOb = res;
+                    });
+                },
+                //麦克风音量检测-结束
+                testMicrophoneHandelStop() {
+                    if (this.testMicrophoneOb) {
+                        this.testMicrophoneOb.yes();
+                        this.testMicrophoneVolume = 0;
+                        this.testMicrophoneOb = null;
+                    }
+                },
+                //获取get参数
+                getQueryVariable(variable) {
+                    let query = window.location.search.substring(1);
+                    let vars = query.split("&");
+                    for (let i = 0; i < vars.length; i++) {
+                        let pair = vars[i].split("=");
+                        if (pair[0] === variable) {
+                            return pair[1];
+                        }
+                    }
+                    return false;
+                },
+            },
+        });
+    </script>
 </html>
 <style>
     /*ui框架-表单行间距缩小*/
-    .el-form-item--mini.el-form-item, .el-form-item--small.el-form-item {
+    .el-form-item--mini.el-form-item,
+    .el-form-item--small.el-form-item {
         margin-bottom: 5px;
     }
 
@@ -1024,7 +1402,7 @@
     }
 
     .my-softphone .soft-function:hover {
-        background-color: rgba(0, 0, 0, .10);
+        background-color: rgba(0, 0, 0, 0.1);
     }
 
     .my-softphone .soft-function.disabled {
@@ -1043,7 +1421,6 @@
     .my-softphone .soft-function .soft-function {
         margin: 0 !important;
     }
-
 
     .number-card-button {
         border: 1px solid #ccc;
@@ -1078,5 +1455,4 @@
         text-align: center;
         font-size: 0.5rem;
     }
-
 </style>

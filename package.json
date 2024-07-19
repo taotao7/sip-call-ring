@@ -1,8 +1,12 @@
 {
-  "name": "sip-call",
+  "name": "sip-call-ring",
   "version": "1.3.6",
-  "description": "jssip freeswitch",
-  "keywords": ["jssip", "freeswitch", "softphone"],
+  "description": "jssip freeswitch have ring call",
+  "keywords": [
+    "jssip",
+    "freeswitch",
+    "softphone"
+  ],
   "license": "MIT",
   "main": "lib/bundle.cjs.js",
   "module": "lib/bundle.esm.js",
@@ -41,5 +45,6 @@
   "dependencies": {
     "jssip": "^3.9.1",
     "uuid": "^8.3.2"
-  }
+  },
+  "packageManager": "pnpm"
 }
