@@ -1,3 +1,4 @@
+fork with https://github.com/xsdhy/softphone
 # 话务条([demo](https://softphone.xsdhy.com/))
 本项目是基于JsSIP实现的webrtc软电话条、话务条。不依赖于其他业务系统，支持直接对接opensips、freeswitch。
 支持react、vue、jquery、原生js。
@@ -9,8 +10,8 @@
 #### 使用 npm 或 yarn 安装#
 我们推荐使用 npm 或 yarn 的方式进行开发，不仅可在开发环境轻松调试，也可放心地在生产环境打包部署使用，享受整个生态圈和工具链带来的诸多好处。
 ```bash
-npm install sip-call --save
-yarn add sip-call
+npm install sip-call-ring --save
+yarn add sip-call-ring
 ```
 #### 浏览器引入
 在浏览器中使用 script 和 link 标签直接引入文件，并使用全局变量 SipCall。

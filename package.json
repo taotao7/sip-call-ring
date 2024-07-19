@@ -1,6 +1,6 @@
 {
   "name": "sip-call-ring",
-  "version": "1.3.6",
+  "version": "1.3.7",
   "description": "jssip freeswitch have ring call",
   "keywords": [
     "jssip",
@@ -46,5 +46,5 @@
     "jssip": "^3.9.1",
     "uuid": "^8.3.2"
   },
-  "packageManager": "pnpm"
+  "packageManager": "pnpm@9.5.0"
 }
