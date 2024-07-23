@@ -43,6 +43,8 @@
     "typescript": "^4.7.4"
   },
   "dependencies": {
+    "@types/blueimp-md5": "^2.18.2",
+    "blueimp-md5": "^2.19.0",
     "jssip": "^3.9.1",
     "uuid": "^8.3.2"
   },

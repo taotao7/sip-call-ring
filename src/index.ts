@@ -1,5 +1,6 @@
 import * as jssip from "jssip";
 import { v4 as uuidv4 } from "uuid";
+import SipSocket from "./sip";
 import {
   EndEvent,
   HoldEvent,
@@ -148,6 +149,8 @@ export default class SipCall {
   private stateEventListener: Function | undefined;
 
   private stunConfig: StunConfig | undefined;
+  // websocks client
+  private sipSocket: SipSocket | undefined;
 
   //构造函数-初始化SDK
   constructor(config: InitConfig) {
@@ -180,6 +183,17 @@ export default class SipCall {
     let proto = config.proto ? "wss" : "ws";
     let wsServer = proto + "://" + config.host + ":" + config.port;
     this.socket = new jssip.WebSocketInterface(wsServer);
+    if (this.stunConfig?.username && this.stunConfig.password) {
+      this.sipSocket = new SipSocket(
+        proto,
+        config.host,
+        config.port,
+        this.stunConfig?.username,
+        this.stunConfig.password
+      );
+    } else {
+      throw new Error("username or password is required");
+    }
 
     this.ua = new jssip.UA({
       sockets: [this.socket],
@@ -336,7 +350,7 @@ export default class SipCall {
           this.stopAudio();
           this.onChangeState(State.IN_CALL, null);
         });
-      },
+      }
     );
 
     this.ua.on(
@@ -349,7 +363,7 @@ export default class SipCall {
         s.on("failed", (evt) => {
           // console.log("newMessage-succeeded:", data)
         });
-      },
+      }
     );
 
     //启动UA
@@ -432,7 +446,7 @@ export default class SipCall {
         }
         if (this.currentStatReport.roundTripTime != undefined) {
           ls.latencyTime = Math.floor(
-            this.currentStatReport.roundTripTime * 1000,
+            this.currentStatReport.roundTripTime * 1000
           );
         }
         console.debug(
@@ -441,7 +455,7 @@ export default class SipCall {
             "% / " +
             (ls.downLossRate * 100).toFixed(2) +
             "%",
-          "延迟:" + ls.latencyTime.toFixed(2) + "ms",
+          "延迟:" + ls.latencyTime.toFixed(2) + "ms"
         );
         this.onChangeState(State.LATENCY_STAT, ls);
       });
@@ -485,7 +499,7 @@ export default class SipCall {
 
   private onChangeState(
     event: String,
-    data: StateListenerMessage | CallEndEvent | LatencyStat | null,
+    data: StateListenerMessage | CallEndEvent | LatencyStat | null
   ) {
     if (undefined === this.stateEventListener) {
       return;
