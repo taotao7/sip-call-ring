@@ -47,7 +47,7 @@ type CallDirection = "outbound" | "inbound";
 
 interface RTCIceServer {
   credential?: string;
-  credentialType?: RTCIceCredentialType;
+  credentialType?: any;
   urls: string | string[];
   username?: string;
 }
@@ -709,40 +709,42 @@ export default class SipCall {
 
   //麦克风检测
   public micCheck() {
-    navigator.permissions.query({ name: "microphone" }).then((result) => {
-      if (result.state == "denied") {
-        this.onChangeState(State.MIC_ERROR, {
-          msg: "麦克风权限被禁用,请设置允许使用麦克风",
-        });
-        return;
-      } else if (result.state == "prompt") {
-        this.onChangeState(State.MIC_ERROR, {
-          msg: "麦克风权限未开启,请设置允许使用麦克风权限后重试",
-        });
-      }
-      //经过了上面的检测，这一步应该不需要了
-      if (navigator.mediaDevices == undefined) {
-        this.onChangeState(State.MIC_ERROR, {
-          msg: "麦克风检测异常,请检查麦克风权限是否开启,是否在HTTPS站点",
-        });
-        return;
-      }
-      navigator.mediaDevices
-        .getUserMedia({
-          video: false,
-          audio: true,
-        })
-        .then((_) => {
-          _.getTracks().forEach((track) => {
-            track.stop();
-          });
-        })
-        .catch((_) => {
+    navigator.permissions
+      .query({ name: "microphone" } as any)
+      .then((result) => {
+        if (result.state == "denied") {
           this.onChangeState(State.MIC_ERROR, {
-            msg: "麦克风检测异常,请检查麦克风是否插好",
+            msg: "麦克风权限被禁用,请设置允许使用麦克风",
           });
-        });
-    });
+          return;
+        } else if (result.state == "prompt") {
+          this.onChangeState(State.MIC_ERROR, {
+            msg: "麦克风权限未开启,请设置允许使用麦克风权限后重试",
+          });
+        }
+        //经过了上面的检测，这一步应该不需要了
+        if (navigator.mediaDevices == undefined) {
+          this.onChangeState(State.MIC_ERROR, {
+            msg: "麦克风检测异常,请检查麦克风权限是否开启,是否在HTTPS站点",
+          });
+          return;
+        }
+        navigator.mediaDevices
+          .getUserMedia({
+            video: false,
+            audio: true,
+          })
+          .then((_) => {
+            _.getTracks().forEach((track) => {
+              track.stop();
+            });
+          })
+          .catch((_) => {
+            this.onChangeState(State.MIC_ERROR, {
+              msg: "麦克风检测异常,请检查麦克风是否插好",
+            });
+          });
+      });
   }
 
   //麦克风测试
