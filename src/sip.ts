@@ -1,7 +1,9 @@
 import md5 from "blueimp-md5";
+import { ofetch, $Fetch } from "ofetch";
+
 // 坐席用
 class SipSocket {
-  apiServer: AxiosInstance;
+  apiServer: $Fetch;
   client: WebSocket;
   status: string | undefined;
   auth: {
@@ -26,7 +28,25 @@ class SipSocket {
     const apiServer =
       (protocol ? "https" : "http") + "://" + host + ":" + port + "/api/sdk";
     this.client = new WebSocket(baseUrl);
-    this.apiServer;
+    const that = this;
+    this.apiServer = ofetch.create({
+      baseURL: apiServer,
+      headers: {
+        "Content-Type": "application/json",
+      },
+      onRequest(context) {
+        // 检查token是否需要刷新
+        if (that.auth.expireAt - new Date().getTime() < 1000 * 60 * 90) {
+          that.refreshToken();
+        }
+        if (that.auth.token) {
+          context.options.headers = {
+            ...context.options.headers,
+            "x-api-key": that.auth.token,
+          };
+        }
+      },
+    });
     this.listen();
     this.login(username, password);
   }
@@ -73,6 +93,55 @@ class SipSocket {
 
   public logout() {
     this.client.send(JSON.stringify({ action: "logout" }));
+  }
+
+  public onDialing() {
+    return this.apiServer("/agent/status/switch", {
+      method: "POST",
+      body: {
+        action: "dialing",
+      },
+    });
+  }
+
+  public onResting() {
+    return this.apiServer("/agent/status/switch", {
+      method: "POST",
+      body: {
+        action: "resting",
+      },
+    });
+  }
+
+  public onIdle() {
+    this.apiServer("/agent/status/switch", {
+      method: "POST",
+      body: {
+        action: "idle",
+      },
+    });
+  }
+
+  public async refreshToken() {
+    const res = await this.apiServer("/token/refresh", {
+      method: "POST",
+      body: {
+        action: "refreshToken",
+        params: {
+          refreshToken: this.auth.refreshToken,
+        },
+      },
+      parseResponse: JSON.parse,
+    });
+
+    // TODO 测试接口数据是否返回一致
+    if (res.code === 0 && res?.data?.token) {
+      this.auth.token = res.data.token;
+      this.auth.refreshToken = res.data.refreshToken;
+      this.auth.expireAt = res.data.expireAt;
+    } else {
+      throw new Error("refreshToken error");
+    }
   }
 }
 

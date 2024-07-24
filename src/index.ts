@@ -590,6 +590,8 @@ export default class SipCall {
   //发起呼叫
   public call = (phone: string, param: CallExtraParam = {}): String => {
     this.micCheck();
+    // 拨打电话后告知server状态变动
+    this.sipSocket?.onDialing();
     //注册情况下发起呼叫
     this.currentCallId = uuidv4();
     if (this.ua && this.ua.isRegistered()) {
