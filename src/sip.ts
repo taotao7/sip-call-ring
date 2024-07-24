@@ -114,7 +114,7 @@ class SipSocket {
   }
 
   public onIdle() {
-    this.apiServer("/agent/status/switch", {
+    return this.apiServer("/agent/status/switch", {
       method: "POST",
       body: {
         action: "idle",
