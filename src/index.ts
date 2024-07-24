@@ -2,7 +2,6 @@ import * as jssip from "jssip";
 import { v4 as uuidv4 } from "uuid";
 import SipSocket from "./sip";
 import {
-  EndEvent,
   HoldEvent,
   IceCandidateEvent,
   IncomingEvent,
@@ -178,6 +177,16 @@ export default class SipCall {
     } else {
       jssip.debug.disable();
     }
+    //网络情况统计
+    this.currentStatReport = {
+      outboundPacketsSent: 0,
+      outboundLost: 0,
+      inboundLost: 0,
+      inboundPacketsSent: 0,
+      roundTripTime: 0,
+      inboundAudioLevel: 0,
+      outboundAudioLevel: 0,
+    };
 
     // JsSIP.C.SESSION_EXPIRES=120,JsSIP.C.MIN_SESSION_EXPIRES=120;
     let proto = config.proto ? "wss" : "ws";
@@ -185,7 +194,7 @@ export default class SipCall {
     this.socket = new jssip.WebSocketInterface(wsServer);
     if (this.stunConfig?.username && this.stunConfig.password) {
       this.sipSocket = new SipSocket(
-        proto,
+        config.proto,
         config.host,
         config.port,
         this.stunConfig?.username,
@@ -216,18 +225,18 @@ export default class SipCall {
       }
     });
     //websocket连接失败
-    this.ua.on("disconnected", (e) => {
+    this.ua.on("disconnected", (e: any) => {
       this.ua.stop();
       if (e.error) {
         this.onChangeState(State.DISCONNECTED, e.reason);
       }
     });
     //注册成功
-    this.ua.on("registered", (e) => {
+    this.ua.on("registered", () => {
       this.onChangeState(State.REGISTERED, { localAgent: this.localAgent });
     });
     //取消注册
-    this.ua.on("unregistered", (e) => {
+    this.ua.on("unregistered", () => {
       // console.log("unregistered:", e);
       this.ua.stop();
       this.onChangeState(State.UNREGISTERED, { localAgent: this.localAgent });
@@ -239,7 +248,7 @@ export default class SipCall {
       this.ua.stop();
     });
     //Fired a few seconds before the registration expires
-    this.ua.on("registrationExpiring", (e) => {
+    this.ua.on("registrationExpiring", () => {
       // console.log("registrationExpiring")
       this.ua.register();
     });
@@ -314,7 +323,7 @@ export default class SipCall {
           // console.info('accepted')
         });
 
-        s.on("ended", (evt: EndEvent) => {
+        s.on("ended", (evt: any) => {
           // console.info('通话结束-->通话结束')
           let evtData: CallEndEvent = {
             answered: true,
@@ -327,7 +336,7 @@ export default class SipCall {
           this.onChangeState(State.CALL_END, evtData);
         });
 
-        s.on("failed", (evt: EndEvent) => {
+        s.on("failed", (evt: any) => {
           // console.info('通话失败-->通话失败')
           let evtData: CallEndEvent = {
             answered: false,
@@ -374,13 +383,6 @@ export default class SipCall {
   private handleAudio(pc: RTCPeerConnection) {
     this.audioView.autoplay = true;
 
-    //网络情况统计
-    this.currentStatReport = {
-      outboundPacketsSent: 0,
-      outboundLost: 0,
-      inboundLost: 0,
-      inboundPacketsSent: 0,
-    };
     this.currentLatencyStatTimer = setInterval(() => {
       pc.getStats().then((stats) => {
         stats.forEach((report) => {
@@ -469,6 +471,7 @@ export default class SipCall {
       };
     } else {
       //onaddstream方法被规范不建议使用
+      //@ts-ignore
       pc.onaddstream = (media: { stream: any }) => {
         let remoteStream = media.stream;
         if (remoteStream.active) {
@@ -494,6 +497,9 @@ export default class SipCall {
       outboundLost: 0,
       inboundLost: 0,
       inboundPacketsSent: 0,
+      roundTripTime: 0,
+      inboundAudioLevel: 0,
+      outboundAudioLevel: 0,
     };
   }
 
@@ -552,7 +558,7 @@ export default class SipCall {
     this.ua.sendMessage(target, content, options);
   };
 
-  public getCallOptionPcConfig(): RTCConfiguration | undefined {
+  public getCallOptionPcConfig(): RTCConfiguration | any {
     if (this.stunConfig && this.stunConfig.type && this.stunConfig.host) {
       if ("turn" === this.stunConfig.type) {
         return {
@@ -787,19 +793,16 @@ export default class SipCall {
   }
 
   public playAudio() {
-    if (window?.electronAPI as any) {
-      window.electronAPI.createNotification("来电提醒", "您有一通电话正在呼入");
-    }
     let ringAudio = document.getElementById("ringMediaAudioId");
     if (!ringAudio) {
       ringAudio = document.createElement("audio");
       ringAudio.id = "ringMediaAudioId";
       ringAudio.hidden = true;
-      ringAudio.src = ring;
-      ringAudio.loop = "loop";
+      (ringAudio as any).src = ring;
+      (ringAudio as any).loop = "loop";
       document.body.appendChild(ringAudio);
     }
-    ringAudio.play();
+    (ringAudio as any).play();
   }
 
   public stopAudio() {

@@ -1,7 +1,7 @@
 import md5 from "blueimp-md5";
 // 坐席用
 class SipSocket {
-  baseUrl: string;
+  apiServer: AxiosInstance;
   client: WebSocket;
   status: string | undefined;
   auth: {
@@ -15,14 +15,18 @@ class SipSocket {
   };
 
   constructor(
-    protocol: string,
+    protocol: boolean,
     host: string,
     port: string,
     username: string,
     password: string
   ) {
-    this.baseUrl = protocol + "://" + host + ":" + port + "/api/sdk/ws";
-    this.client = new WebSocket(this.baseUrl);
+    const baseUrl =
+      (protocol ? "wss" : "ws") + "://" + host + ":" + port + "/api/sdk/ws";
+    const apiServer =
+      (protocol ? "https" : "http") + "://" + host + ":" + port + "/api/sdk";
+    this.client = new WebSocket(baseUrl);
+    this.apiServer;
     this.listen();
     this.login(username, password);
   }
