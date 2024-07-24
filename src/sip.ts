@@ -5,7 +5,7 @@ import { ofetch, $Fetch } from "ofetch";
 class SipSocket {
   apiServer: $Fetch;
   client: WebSocket;
-  status: string | undefined;
+  status: number = 0;
   auth: {
     token: string;
     refreshToken: string;

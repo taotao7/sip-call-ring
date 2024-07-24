@@ -129,6 +129,18 @@
             </div>
 
             <div
+              v-if="(statusIsring || statusIsCall)"
+              class="soft-function"
+              :class="{disabled:!(statusIsring || statusIsCall)}"
+              @click="hungup"
+            >
+              <iconpark-icon name="phone-off"></iconpark-icon>
+              <div class="text">
+                {{statusMap[sipClient?.sipSocket?.status]}}
+              </div>
+            </div>
+
+            <div
               v-if="(statusIsring && 'inbound' === callDirection)"
               class="soft-function"
               :class="{disabled:!(statusIsring && 'inbound' === callDirection)}"
@@ -804,6 +816,16 @@
             { label: "Portuguese", value: "pt" },
           ],
           callEndInfo: undefined,
+          // 1: 离线, 2: 空闲, 3: 响铃中, 4: 通话中, 5: 摘机中, 6: 小休中
+          statusMap: {
+            0: "未连接",
+            1: "离线",
+            2: "空闲",
+            3: "响铃中",
+            4: "通话中",
+            5: "摘机中",
+            6: "小休中",
+          },
         };
       },
       created() {
