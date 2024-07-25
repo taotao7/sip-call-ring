@@ -188,21 +188,24 @@ export default class SipCall {
       outboundAudioLevel: 0,
     };
 
-    // JsSIP.C.SESSION_EXPIRES=120,JsSIP.C.MIN_SESSION_EXPIRES=120;
-    let proto = config.proto ? "wss" : "ws";
-    let wsServer = proto + "://" + config.host + ":" + config.port;
-    this.socket = new jssip.WebSocketInterface(wsServer);
     if (this.stunConfig?.username && this.stunConfig.password) {
       this.sipSocket = new SipSocket(
         config.proto,
         config.host,
         config.port,
         this.stunConfig?.username,
-        this.stunConfig.password
+        this.stunConfig.password,
+        //这里监听到action 为kick就断开
+        this.unregister.bind(this),
       );
     } else {
       throw new Error("username or password is required");
     }
+
+    // JsSIP.C.SESSION_EXPIRES=120,JsSIP.C.MIN_SESSION_EXPIRES=120;
+    let proto = config.proto ? "wss" : "ws";
+    let wsServer = proto + "://" + config.host + ":" + config.port;
+    this.socket = new jssip.WebSocketInterface(wsServer);
 
     this.ua = new jssip.UA({
       sockets: [this.socket],
@@ -359,7 +362,7 @@ export default class SipCall {
           this.stopAudio();
           this.onChangeState(State.IN_CALL, null);
         });
-      }
+      },
     );
 
     this.ua.on(
@@ -372,7 +375,7 @@ export default class SipCall {
         s.on("failed", (evt) => {
           // console.log("newMessage-succeeded:", data)
         });
-      }
+      },
     );
 
     //启动UA
@@ -448,7 +451,7 @@ export default class SipCall {
         }
         if (this.currentStatReport.roundTripTime != undefined) {
           ls.latencyTime = Math.floor(
-            this.currentStatReport.roundTripTime * 1000
+            this.currentStatReport.roundTripTime * 1000,
           );
         }
         console.debug(
@@ -457,7 +460,7 @@ export default class SipCall {
             "% / " +
             (ls.downLossRate * 100).toFixed(2) +
             "%",
-          "延迟:" + ls.latencyTime.toFixed(2) + "ms"
+          "延迟:" + ls.latencyTime.toFixed(2) + "ms",
         );
         this.onChangeState(State.LATENCY_STAT, ls);
       });
@@ -505,7 +508,7 @@ export default class SipCall {
 
   private onChangeState(
     event: String,
-    data: StateListenerMessage | CallEndEvent | LatencyStat | null
+    data: StateListenerMessage | CallEndEvent | LatencyStat | null,
   ) {
     if (undefined === this.stateEventListener) {
       return;
@@ -794,6 +797,25 @@ export default class SipCall {
       return [];
     }
     return await navigator.mediaDevices.enumerateDevices();
+  }
+
+  // 坐席相关功能
+  public getSipStatus() {
+    if (this.sipSocket?.status) {
+      return this.sipSocket.status;
+    } else {
+      return 0;
+    }
+  }
+
+  // 设置为小休
+  public setResting() {
+    this.sipSocket?.onResting();
+  }
+
+  // 设置为空闲
+  public setIdle() {
+    this.sipSocket?.onIdle();
   }
 
   public playAudio() {

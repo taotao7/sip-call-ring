@@ -37,6 +37,7 @@
     "@types/blueimp-md5": "^2.18.2",
     "@types/node": "^17.0.45",
     "@types/uuid": "^8.3.4",
+    "prettier": "^3.3.3",
     "rollup": "^2.79.1",
     "rollup-plugin-polyfill-node": "^0.10.2",
     "rollup-plugin-serve": "^2.0.3",

@@ -136,7 +136,7 @@
             >
               <iconpark-icon name="phone-off"></iconpark-icon>
               <div class="text">
-                {{statusMap[sipClient?.sipSocket?.status]}}
+                {{statusMap[sipClient.getSipStatus()]}}
               </div>
             </div>
 
@@ -829,8 +829,6 @@
         };
       },
       created() {
-        console.log("v1.3.5.1");
-
         this.initHistoryAccounts();
         this.callPhoneNumber = localStorage.getItem("callPhoneNumber");
 

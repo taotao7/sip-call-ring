@@ -21,7 +21,8 @@ class SipSocket {
     host: string,
     port: string,
     username: string,
-    password: string
+    password: string,
+    kick: () => void, // 接受kick操作
   ) {
     const baseUrl =
       (protocol ? "wss" : "ws") + "://" + host + ":" + port + "/api/sdk/ws";
@@ -47,30 +48,37 @@ class SipSocket {
         }
       },
     });
-    this.listen();
+    this.listen(kick);
     this.login(username, password);
   }
 
-  public listen() {
+  public listen(kick: () => void) {
     this.client.onopen = () => {
       console.log("WebSocket 连接成功");
     };
     this.client.onmessage = (event) => {
       const res = JSON.parse(event.data);
       // 心跳
-      if (res.action === "ping") {
-        this.client.send(JSON.stringify({ action: "pong" }));
+      if (res?.message === "pong") {
+        setTimeout(() => {
+          this.client.send(JSON.stringify({ action: "ping" }));
+        }, 2000);
       }
 
-      if (res?.code === 0 && res?.data) {
+      if (res?.code === 0 && res?.data && res?.data?.token) {
         this.auth.token = res.data.token;
         this.auth.refreshToken = res.data.refreshToken;
-        this.auth.expireAt = res.data;
+        this.auth.expireAt = res.data.expireAt;
       }
 
       // 接受服务端的状态
       if (res?.code === 0 && res?.data?.action === "status") {
         this.status = res.data.status;
+      }
+      // kick 被踢出就关闭连接
+      if (res?.code === 0 && res?.data?.action === "kick") {
+        this.client.close();
+        kick();
       }
     };
   }
@@ -81,25 +89,30 @@ class SipSocket {
     this.client.send(
       JSON.stringify({
         action: "login",
+        actionId: "",
         params: {
           username,
           timestamp,
           password: md5(timestamp + password + nonce),
           nonce,
         },
-      })
+      }),
     );
+    // 发起第一次心跳检测
+    setTimeout(() => {
+      this.client.send(JSON.stringify({ action: "ping" }));
+    }, 2000);
   }
 
   public logout() {
-    this.client.send(JSON.stringify({ action: "logout" }));
+    this.client.send(JSON.stringify({ action: "logout", actionId: "" }));
   }
 
   public onDialing() {
     return this.apiServer("/agent/status/switch", {
       method: "POST",
       body: {
-        action: "dialing",
+        status: 5,
       },
     });
   }
@@ -108,7 +121,7 @@ class SipSocket {
     return this.apiServer("/agent/status/switch", {
       method: "POST",
       body: {
-        action: "resting",
+        status: 6,
       },
     });
   }
@@ -117,7 +130,7 @@ class SipSocket {
     return this.apiServer("/agent/status/switch", {
       method: "POST",
       body: {
-        action: "idle",
+        status: 2,
       },
     });
   }
@@ -126,10 +139,7 @@ class SipSocket {
     const res = await this.apiServer("/token/refresh", {
       method: "POST",
       body: {
-        action: "refreshToken",
-        params: {
-          refreshToken: this.auth.refreshToken,
-        },
+        refreshToken: this.auth.refreshToken,
       },
       parseResponse: JSON.parse,
     });
