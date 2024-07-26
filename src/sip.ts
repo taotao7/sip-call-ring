@@ -158,7 +158,7 @@ class SipSocket {
     return this.apiServer("/agent/status/switch", {
       method: "POST",
       body: {
-        status: 5,
+        action: 5,
       },
     });
   }
@@ -167,7 +167,7 @@ class SipSocket {
     return this.apiServer("/agent/status/switch", {
       method: "POST",
       body: {
-        status: 6,
+        action: 6,
       },
     });
   }
@@ -176,7 +176,7 @@ class SipSocket {
     return this.apiServer("/agent/status/switch", {
       method: "POST",
       body: {
-        status: 2,
+        action: 2,
       },
     });
   }
