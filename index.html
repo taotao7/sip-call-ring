@@ -61,9 +61,21 @@
                 <iconpark-icon name="checkIn-qianru"></iconpark-icon>
                 <div class="text">{{$t('message.login')}}</div>
               </div>
-              <div v-else class="soft-function" @click="logout">
-                <iconpark-icon name="checkOut-qianchu"></iconpark-icon>
-                <div class="text">{{$t('message.logout')}}</div>
+              <div
+                v-else
+                style="
+                  display: flex;
+                  flex-direction: row;
+                  justify-content: center;
+                  align-items: center;
+                  gap: 10px;
+                "
+              >
+                <div class="text">坐席状态: {{statusMap[sipStatus]}}</div>
+                <div class="soft-function" @click="logout">
+                  <iconpark-icon name="checkOut-qianchu"></iconpark-icon>
+                  <div class="text">{{$t('message.logout')}}</div>
+                </div>
               </div>
             </div>
 
@@ -126,16 +138,6 @@
             >
               <iconpark-icon name="phone-off"></iconpark-icon>
               <div class="text">{{$t('message.hangUp')}}</div>
-            </div>
-
-            <div
-              v-if="(statusIsring || statusIsCall)"
-              class="soft-function"
-              :class="{disabled:!(statusIsring || statusIsCall)}"
-              @click="hungup"
-            >
-              <iconpark-icon name="phone-off"></iconpark-icon>
-              <div class="text">{{statusMap[sipClient.getSipStatus()]}}</div>
             </div>
 
             <div
@@ -210,6 +212,11 @@
             >{{callEndInfo.code}} {{callEndInfo.cause}}</span
           >
           <br />
+        </div>
+
+        <div>
+          <el-button @click="setResting">制为休息</el-button>
+          <el-button @click="setIdle">制为空闲</el-button>
         </div>
         <div style="padding-top: 5px">
           <el-input
@@ -814,6 +821,7 @@
             { label: "Portuguese", value: "pt" },
           ],
           callEndInfo: undefined,
+          sipStatus: 0,
           // 1: 离线, 2: 空闲, 3: 响铃中, 4: 通话中, 5: 摘机中, 6: 小休中
           statusMap: {
             0: "未连接",
@@ -851,6 +859,11 @@
         SipCall.getMediaDeviceInfo().then((res) => {
           this.mediaDevices = res;
         });
+
+        // 实时更新sip status状态
+        setInterval(() => {
+          this.sipStatus = this.sipClient?.getSipStatus();
+        }, 2000);
       },
       methods: {
         login() {
@@ -1196,6 +1209,12 @@
             }
           }
           return false;
+        },
+        setResting() {
+          this.sipClient.setResting();
+        },
+        setIdle() {
+          this.sipClient.setIdle();
         },
       },
     });

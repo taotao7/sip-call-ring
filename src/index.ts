@@ -556,6 +556,7 @@ export default class SipCall {
   //取消注册
   public unregister() {
     if (this.ua && this.ua.isConnected() && this.ua.isRegistered()) {
+      this.sipSocket?.logout();
       this.ua.unregister({ all: true });
     } else {
       this.onChangeState(State.ERROR, { msg: "尚未注册，操作禁止." });

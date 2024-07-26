@@ -62,7 +62,6 @@ class SipSocket {
 
   public listen(kick: () => void) {
     this.client.onopen = () => {
-      console.log("WebSocket 连接成功");
       this.login();
     };
     this.client.onmessage = (event) => {
@@ -101,11 +100,9 @@ class SipSocket {
       const timer = setInterval(async () => {
         start += 2000;
         if (this.loginStatus) {
-          console.log("获取webrtc地址");
           try {
             const res = await this.getSipWebrtcAddr();
             clearInterval(timer);
-            console.log(res.data);
             const params = {
               ...this.auth,
               ...res.data,
