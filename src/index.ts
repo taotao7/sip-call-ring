@@ -188,198 +188,213 @@ export default class SipCall {
       outboundAudioLevel: 0,
     };
 
-    if (this.stunConfig?.username && this.stunConfig.password) {
+    if (config.extNo && config.extPwd) {
       this.sipSocket = new SipSocket(
         config.proto,
         config.host,
         config.port,
-        this.stunConfig?.username,
-        this.stunConfig.password,
+        config.extNo,
+        config.extPwd,
         //这里监听到action 为kick就断开
-        this.unregister.bind(this),
+        this.unregister.bind(this)
       );
+      this.sipSocket
+        .checkLogin()
+        .then((r) => {
+          if (!r.token && !r.host) {
+            throw new Error("login failed");
+          }
+          // JsSIP.C.SESSION_EXPIRES=120,JsSIP.C.MIN_SESSION_EXPIRES=120;
+          let proto = r.ssl ? "wss" : "ws";
+          let wsServer = proto + "://" + r.host + ":" + r.port;
+          this.socket = new jssip.WebSocketInterface(wsServer);
+
+          this.ua = new jssip.UA({
+            sockets: [this.socket],
+            uri: "sip:" + config.extNo + "@" + config.domain,
+            password: config.extPwd,
+            register: false,
+            register_expires: 15,
+            session_timers: false,
+            // connection_recovery_max_interval:30,
+            // connection_recovery_min_interval:4,
+            user_agent: "JsSIP 3.9.0",
+          });
+
+          //websocket连接成功
+          this.ua.on("connected", (e) => {
+            this.onChangeState(State.CONNECTED, null);
+            //自动注册
+            if (config.autoRegister) {
+              this.ua.register();
+            }
+          });
+          //websocket连接失败
+          this.ua.on("disconnected", (e: any) => {
+            this.ua.stop();
+            if (e.error) {
+              this.onChangeState(State.DISCONNECTED, e.reason);
+            }
+          });
+          //注册成功
+          this.ua.on("registered", () => {
+            this.onChangeState(State.REGISTERED, {
+              localAgent: this.localAgent,
+            });
+          });
+          //取消注册
+          this.ua.on("unregistered", () => {
+            // console.log("unregistered:", e);
+            this.ua.stop();
+            this.onChangeState(State.UNREGISTERED, {
+              localAgent: this.localAgent,
+            });
+          });
+          //注册失败
+          this.ua.on("registrationFailed", (e) => {
+            // console.error("registrationFailed", e)
+            this.onChangeState(State.REGISTER_FAILED, {
+              msg: "注册失败:" + e.cause,
+            });
+            this.ua.stop();
+          });
+          //Fired a few seconds before the registration expires
+          this.ua.on("registrationExpiring", () => {
+            // console.log("registrationExpiring")
+            this.ua.register();
+          });
+
+          //电话事件监听
+          this.ua.on(
+            "newRTCSession",
+            (data: IncomingRTCSessionEvent | OutgoingRTCSessionEvent) => {
+              // console.info('on new rtcsession: ', data)
+              let s = data.session;
+              let currentEvent: String;
+              if (data.originator === "remote") {
+                //来电处理
+                //console.info('>>>>>>>>>>>>>>>>>>>>来电>>>>>>>>>>>>>>>>>>>>')
+                this.incomingSession = data.session;
+                this.currentSession = this.incomingSession;
+                this.direction = "inbound";
+                currentEvent = State.INCOMING_CALL;
+                this.playAudio();
+              } else {
+                //console.info('<<<<<<<<<<<<<<<<<<<<外呼<<<<<<<<<<<<<<<<<<<<')
+                this.direction = "outbound";
+                currentEvent = State.OUTGOING_CALL;
+                this.playAudio();
+              }
+
+              s.on("peerconnection", (evt: PeerConnectionEvent) => {
+                // console.info('onPeerconnection');
+                //处理通话中媒体流
+                this.handleAudio(evt.peerconnection);
+              });
+
+              s.on("connecting", () => {
+                // console.info('connecting')
+              });
+
+              //防止检测时间过长
+              let iceCandidateTimeout: NodeJS.Timeout;
+              s.on("icecandidate", (evt: IceCandidateEvent) => {
+                if (iceCandidateTimeout != null) {
+                  clearTimeout(iceCandidateTimeout);
+                }
+                if (
+                  evt.candidate.type === "srflx" ||
+                  evt.candidate.type === "relay"
+                ) {
+                  evt.ready();
+                }
+                iceCandidateTimeout = setTimeout(evt.ready, 1000);
+              });
+
+              s.on("sending", () => {
+                // console.info('sending')
+              });
+
+              s.on("progress", (evt: IncomingEvent | OutgoingEvent) => {
+                // console.info('通话振铃-->通话振铃')
+                //s.remote_identity.display_name
+                this.onChangeState(currentEvent, {
+                  direction: this.direction,
+                  otherLegNumber: data.request.from.uri.user,
+                  callId: this.currentCallId,
+                });
+              });
+
+              s.on("accepted", (evt: IncomingEvent | OutgoingEvent) => {
+                // console.info('通话中-->通话中')
+                this.stopAudio();
+                this.onChangeState(State.IN_CALL, null);
+              });
+              s.on("accepted", () => {
+                // console.info('accepted')
+              });
+
+              s.on("ended", (evt: any) => {
+                // console.info('通话结束-->通话结束')
+                let evtData: CallEndEvent = {
+                  answered: true,
+                  cause: evt.cause,
+                  code: evt.message?.status_code ?? 0,
+                  originator: evt.originator,
+                };
+                this.stopAudio();
+                this.cleanCallingData();
+                this.onChangeState(State.CALL_END, evtData);
+              });
+
+              s.on("failed", (evt: any) => {
+                // console.info('通话失败-->通话失败')
+                let evtData: CallEndEvent = {
+                  answered: false,
+                  cause: evt.cause,
+                  code: evt.message?.status_code ?? 0,
+                  originator: evt.originator,
+                };
+                this.stopAudio();
+                this.cleanCallingData();
+                this.onChangeState(State.CALL_END, evtData);
+              });
+
+              s.on("hold", (evt: HoldEvent) => {
+                //console.info('通话保持-->通话保持')
+                this.onChangeState(State.HOLD, null);
+              });
+
+              s.on("unhold", (evt: HoldEvent) => {
+                //console.info('通话恢复-->通话恢复')
+                this.stopAudio();
+                this.onChangeState(State.IN_CALL, null);
+              });
+            }
+          );
+
+          this.ua.on(
+            "newMessage",
+            (data: IncomingMessageEvent | OutgoingMessageEvent) => {
+              let s = data.message;
+              s.on("succeeded", (evt) => {
+                // console.log("newMessage-succeeded:", data, evt)
+              });
+              s.on("failed", (evt) => {
+                // console.log("newMessage-succeeded:", data)
+              });
+            }
+          );
+
+          //启动UA
+          this.ua.start();
+        })
+        .catch((e) => {
+          throw new Error(e);
+        });
     } else {
       throw new Error("username or password is required");
     }
-
-    // JsSIP.C.SESSION_EXPIRES=120,JsSIP.C.MIN_SESSION_EXPIRES=120;
-    let proto = config.proto ? "wss" : "ws";
-    let wsServer = proto + "://" + config.host + ":" + config.port;
-    this.socket = new jssip.WebSocketInterface(wsServer);
-
-    this.ua = new jssip.UA({
-      sockets: [this.socket],
-      uri: "sip:" + config.extNo + "@" + config.domain,
-      password: config.extPwd,
-      register: false,
-      register_expires: 15,
-      session_timers: false,
-      // connection_recovery_max_interval:30,
-      // connection_recovery_min_interval:4,
-      user_agent: "JsSIP 3.9.0",
-    });
-
-    //websocket连接成功
-    this.ua.on("connected", (e) => {
-      this.onChangeState(State.CONNECTED, null);
-      //自动注册
-      if (config.autoRegister) {
-        this.ua.register();
-      }
-    });
-    //websocket连接失败
-    this.ua.on("disconnected", (e: any) => {
-      this.ua.stop();
-      if (e.error) {
-        this.onChangeState(State.DISCONNECTED, e.reason);
-      }
-    });
-    //注册成功
-    this.ua.on("registered", () => {
-      this.onChangeState(State.REGISTERED, { localAgent: this.localAgent });
-    });
-    //取消注册
-    this.ua.on("unregistered", () => {
-      // console.log("unregistered:", e);
-      this.ua.stop();
-      this.onChangeState(State.UNREGISTERED, { localAgent: this.localAgent });
-    });
-    //注册失败
-    this.ua.on("registrationFailed", (e) => {
-      // console.error("registrationFailed", e)
-      this.onChangeState(State.REGISTER_FAILED, { msg: "注册失败:" + e.cause });
-      this.ua.stop();
-    });
-    //Fired a few seconds before the registration expires
-    this.ua.on("registrationExpiring", () => {
-      // console.log("registrationExpiring")
-      this.ua.register();
-    });
-
-    //电话事件监听
-    this.ua.on(
-      "newRTCSession",
-      (data: IncomingRTCSessionEvent | OutgoingRTCSessionEvent) => {
-        // console.info('on new rtcsession: ', data)
-        let s = data.session;
-        let currentEvent: String;
-        if (data.originator === "remote") {
-          //来电处理
-          //console.info('>>>>>>>>>>>>>>>>>>>>来电>>>>>>>>>>>>>>>>>>>>')
-          this.incomingSession = data.session;
-          this.currentSession = this.incomingSession;
-          this.direction = "inbound";
-          currentEvent = State.INCOMING_CALL;
-          this.playAudio();
-        } else {
-          //console.info('<<<<<<<<<<<<<<<<<<<<外呼<<<<<<<<<<<<<<<<<<<<')
-          this.direction = "outbound";
-          currentEvent = State.OUTGOING_CALL;
-          this.playAudio();
-        }
-
-        s.on("peerconnection", (evt: PeerConnectionEvent) => {
-          // console.info('onPeerconnection');
-          //处理通话中媒体流
-          this.handleAudio(evt.peerconnection);
-        });
-
-        s.on("connecting", () => {
-          // console.info('connecting')
-        });
-
-        //防止检测时间过长
-        let iceCandidateTimeout: NodeJS.Timeout;
-        s.on("icecandidate", (evt: IceCandidateEvent) => {
-          if (iceCandidateTimeout != null) {
-            clearTimeout(iceCandidateTimeout);
-          }
-          if (
-            evt.candidate.type === "srflx" ||
-            evt.candidate.type === "relay"
-          ) {
-            evt.ready();
-          }
-          iceCandidateTimeout = setTimeout(evt.ready, 1000);
-        });
-
-        s.on("sending", () => {
-          // console.info('sending')
-        });
-
-        s.on("progress", (evt: IncomingEvent | OutgoingEvent) => {
-          // console.info('通话振铃-->通话振铃')
-          //s.remote_identity.display_name
-          this.onChangeState(currentEvent, {
-            direction: this.direction,
-            otherLegNumber: data.request.from.uri.user,
-            callId: this.currentCallId,
-          });
-        });
-
-        s.on("accepted", (evt: IncomingEvent | OutgoingEvent) => {
-          // console.info('通话中-->通话中')
-          this.stopAudio();
-          this.onChangeState(State.IN_CALL, null);
-        });
-        s.on("accepted", () => {
-          // console.info('accepted')
-        });
-
-        s.on("ended", (evt: any) => {
-          // console.info('通话结束-->通话结束')
-          let evtData: CallEndEvent = {
-            answered: true,
-            cause: evt.cause,
-            code: evt.message?.status_code ?? 0,
-            originator: evt.originator,
-          };
-          this.stopAudio();
-          this.cleanCallingData();
-          this.onChangeState(State.CALL_END, evtData);
-        });
-
-        s.on("failed", (evt: any) => {
-          // console.info('通话失败-->通话失败')
-          let evtData: CallEndEvent = {
-            answered: false,
-            cause: evt.cause,
-            code: evt.message?.status_code ?? 0,
-            originator: evt.originator,
-          };
-          this.stopAudio();
-          this.cleanCallingData();
-          this.onChangeState(State.CALL_END, evtData);
-        });
-
-        s.on("hold", (evt: HoldEvent) => {
-          //console.info('通话保持-->通话保持')
-          this.onChangeState(State.HOLD, null);
-        });
-
-        s.on("unhold", (evt: HoldEvent) => {
-          //console.info('通话恢复-->通话恢复')
-          this.stopAudio();
-          this.onChangeState(State.IN_CALL, null);
-        });
-      },
-    );
-
-    this.ua.on(
-      "newMessage",
-      (data: IncomingMessageEvent | OutgoingMessageEvent) => {
-        let s = data.message;
-        s.on("succeeded", (evt) => {
-          // console.log("newMessage-succeeded:", data, evt)
-        });
-        s.on("failed", (evt) => {
-          // console.log("newMessage-succeeded:", data)
-        });
-      },
-    );
-
-    //启动UA
-    this.ua.start();
   }
 
   //处理音频播放
@@ -451,7 +466,7 @@ export default class SipCall {
         }
         if (this.currentStatReport.roundTripTime != undefined) {
           ls.latencyTime = Math.floor(
-            this.currentStatReport.roundTripTime * 1000,
+            this.currentStatReport.roundTripTime * 1000
           );
         }
         console.debug(
@@ -460,7 +475,7 @@ export default class SipCall {
             "% / " +
             (ls.downLossRate * 100).toFixed(2) +
             "%",
-          "延迟:" + ls.latencyTime.toFixed(2) + "ms",
+          "延迟:" + ls.latencyTime.toFixed(2) + "ms"
         );
         this.onChangeState(State.LATENCY_STAT, ls);
       });
@@ -508,7 +523,7 @@ export default class SipCall {
 
   private onChangeState(
     event: String,
-    data: StateListenerMessage | CallEndEvent | LatencyStat | null,
+    data: StateListenerMessage | CallEndEvent | LatencyStat | null
   ) {
     if (undefined === this.stateEventListener) {
       return;

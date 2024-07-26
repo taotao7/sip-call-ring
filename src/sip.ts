@@ -6,6 +6,11 @@ class SipSocket {
   apiServer: $Fetch;
   client: WebSocket;
   status: number = 0;
+  loginStatus: boolean = false;
+  loginInfo: {
+    username: string;
+    password: string;
+  };
   auth: {
     token: string;
     refreshToken: string;
@@ -22,12 +27,16 @@ class SipSocket {
     port: string,
     username: string,
     password: string,
-    kick: () => void, // 接受kick操作
+    kick: () => void // 接受kick操作
   ) {
     const baseUrl =
       (protocol ? "wss" : "ws") + "://" + host + ":" + port + "/api/sdk/ws";
     const apiServer =
       (protocol ? "https" : "http") + "://" + host + ":" + port + "/api/sdk";
+    this.loginInfo = {
+      username,
+      password,
+    };
     this.client = new WebSocket(baseUrl);
     const that = this;
     this.apiServer = ofetch.create({
@@ -49,12 +58,12 @@ class SipSocket {
       },
     });
     this.listen(kick);
-    this.login(username, password);
   }
 
   public listen(kick: () => void) {
     this.client.onopen = () => {
       console.log("WebSocket 连接成功");
+      this.login();
     };
     this.client.onmessage = (event) => {
       const res = JSON.parse(event.data);
@@ -69,6 +78,7 @@ class SipSocket {
         this.auth.token = res.data.token;
         this.auth.refreshToken = res.data.refreshToken;
         this.auth.expireAt = res.data.expireAt;
+        this.loginStatus = true;
       }
 
       // 接受服务端的状态
@@ -77,15 +87,47 @@ class SipSocket {
       }
       // kick 被踢出就关闭连接
       if (res?.code === 0 && res?.data?.action === "kick") {
+        this.loginStatus = false;
         this.client.close();
         kick();
       }
     };
   }
 
-  public login(username: string, password: string) {
+  // 没2两秒检测一次登录状态
+  public checkLogin() {
+    return new Promise<any>((resolve, reject) => {
+      let start = 0;
+      const timer = setInterval(async () => {
+        start += 2000;
+        if (this.loginStatus) {
+          console.log("获取webrtc地址");
+          try {
+            const res = await this.getSipWebrtcAddr();
+            clearInterval(timer);
+            console.log(res.data);
+            const params = {
+              ...this.auth,
+              ...res.data,
+            };
+            resolve(params);
+          } catch (e) {
+            reject(e);
+            clearInterval(timer);
+          }
+        }
+        if (start > 10000) {
+          reject("login timeout");
+          clearInterval(timer);
+        }
+      }, 2000);
+    });
+  }
+
+  public login() {
     const timestamp = new Date().getTime();
     const nonce = Math.random().toString(32).substr(2);
+    const { username, password } = this.loginInfo;
     this.client.send(
       JSON.stringify({
         action: "login",
@@ -96,7 +138,7 @@ class SipSocket {
           password: md5(timestamp + password + nonce),
           nonce,
         },
-      }),
+      })
     );
     // 发起第一次心跳检测
     setTimeout(() => {
@@ -106,6 +148,13 @@ class SipSocket {
 
   public logout() {
     this.client.send(JSON.stringify({ action: "logout", actionId: "" }));
+  }
+
+  private async getSipWebrtcAddr() {
+    return this.apiServer("/webrtc/addr", {
+      method: "GET",
+      parseResponse: JSON.parse,
+    });
   }
 
   public onDialing() {
