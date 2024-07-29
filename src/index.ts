@@ -834,6 +834,10 @@ export default class SipCall {
     this.sipSocket?.onIdle();
   }
 
+  public transferCall(phone: string) {
+    this.sipSocket?.transfer(phone);
+  }
+
   public playAudio() {
     let ringAudio = document.getElementById("ringMediaAudioId");
     if (!ringAudio) {

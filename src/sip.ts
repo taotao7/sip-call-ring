@@ -181,6 +181,15 @@ class SipSocket {
     });
   }
 
+  public transfer(num: string) {
+    return this.apiServer("/call/transfer", {
+      method: "POST",
+      body: {
+        transferTo: num,
+      },
+    });
+  }
+
   public async refreshToken() {
     const res = await this.apiServer("/token/refresh", {
       method: "POST",
