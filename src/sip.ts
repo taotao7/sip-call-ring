@@ -199,7 +199,6 @@ class SipSocket {
       parseResponse: JSON.parse,
     });
 
-    // TODO 测试接口数据是否返回一致
     if (res.code === 0 && res?.data?.token) {
       this.auth.token = res.data.token;
       this.auth.refreshToken = res.data.refreshToken;

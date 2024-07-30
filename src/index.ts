@@ -836,6 +836,7 @@ export default class SipCall {
 
   public transferCall(phone: string) {
     this.sipSocket?.transfer(phone);
+    this.sipSocket?.refreshToken();
   }
 
   public playAudio() {

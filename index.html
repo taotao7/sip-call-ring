@@ -217,6 +217,7 @@
         <div>
           <el-button @click="setResting">制为休息</el-button>
           <el-button @click="setIdle">制为空闲</el-button>
+          <el-button @click="openTransferDialog">转接</el-button>
         </div>
         <div style="padding-top: 5px">
           <el-input
@@ -534,6 +535,26 @@
         </el-tab-pane>
       </el-tabs>
 
+      <el-dialog
+        :visible.sync="dialogVisible"
+        title="Transfer Call"
+        width="500"
+        :before-close="handleClose"
+      >
+        <el-input
+          v-model="transferNumber"
+          placeholder="Please enter the number"
+        ></el-input>
+        <span slot="footer">
+          <div class="dialog-footer">
+            <el-button @click="dialogVisible = false">Cancel</el-button>
+            <el-button type="primary" @click="transferCall">
+              Confirm
+            </el-button>
+          </div>
+        </span>
+      </el-dialog>
+
       <div id="footer">
         Power By
         <a target="_blank" href="https://github.com/xsdhy/softphone">xsdhy</a>
@@ -833,6 +854,8 @@
             6: "小休中",
             7: "转接中",
           },
+          dialogVisible: false,
+          transferNumber: "",
         };
       },
       created() {
@@ -1216,6 +1239,23 @@
         },
         setIdle() {
           this.sipClient.setIdle();
+        },
+        openTransferDialog() {
+          this.dialogVisible = true;
+        },
+        transferCall() {
+          if (this.transferNumber === "") {
+            this.$message({
+              message: "请输入转接号码",
+              type: "warning",
+            });
+            return;
+          }
+          this.sipClient.transferCall(this.transferNumber);
+        },
+        handleClose() {
+          this.transferNumber = "";
+          this.dialogVisible = false;
         },
       },
     });
