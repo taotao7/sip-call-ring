@@ -61,17 +61,7 @@
                 <iconpark-icon name="checkIn-qianru"></iconpark-icon>
                 <div class="text">{{$t('message.login')}}</div>
               </div>
-              <div
-                v-else
-                style="
-                  display: flex;
-                  flex-direction: row;
-                  justify-content: center;
-                  align-items: center;
-                  gap: 10px;
-                "
-              >
-                <div class="text">坐席状态: {{statusMap[sipStatus]}}</div>
+              <div v-else>
                 <div class="soft-function" @click="logout">
                   <iconpark-icon name="checkOut-qianchu"></iconpark-icon>
                   <div class="text">{{$t('message.logout')}}</div>
@@ -214,10 +204,19 @@
           <br />
         </div>
 
-        <div>
+        <div
+          style="
+            display: flex;
+            flex-direction: row;
+            gap: 4px;
+            justify-content: center;
+            align-items: center;
+          "
+        >
           <el-button @click="setResting">制为休息</el-button>
           <el-button @click="setIdle">制为空闲</el-button>
           <el-button @click="openTransferDialog">转接</el-button>
+          <div class="text">坐席状态: {{statusMap[sipStatus]}}</div>
         </div>
         <div style="padding-top: 5px">
           <el-input
@@ -418,8 +417,8 @@
 
           <div v-if="historyAccounts.length>0">
             <el-divider content-position="left"
-              >{{$t("message.historicalAccountNumber")}}</el-divider
-            >
+              >{{$t("message.historicalAccountNumber")}}
+            </el-divider>
             <div>
               <el-table
                 :data="historyAccounts"
@@ -481,15 +480,15 @@
 
         <el-tab-pane :label="$t('message.DebuggingInformation')" name="test">
           <el-divider content-position="left"
-            >{{$t('message.equipmentList')}}</el-divider
-          >
+            >{{$t('message.equipmentList')}}
+          </el-divider>
           <li v-for="(device,index) in mediaDevices">
             {{ device.kind.replace("audio", "") }}-{{ device.label }}
           </li>
 
           <el-divider content-position="left"
-            >{{$t('message.microphoneTest')}}</el-divider
-          >
+            >{{$t('message.microphoneTest')}}
+          </el-divider>
 
           <el-row>
             <el-col :span="16">
@@ -523,8 +522,8 @@
           </el-row>
 
           <el-divider content-position="left"
-            >{{$t('message.headphoneTest')}}</el-divider
-          >
+            >{{$t('message.headphoneTest')}}
+          </el-divider>
           <audio
             style="height: 30px"
             controls=""
@@ -958,7 +957,7 @@
           if (this.callPhoneNumber && this.callPhoneNumber.length > 0) {
             this.callPhoneNumber = this.callPhoneNumber.substring(
               0,
-              this.callPhoneNumber.length - 1
+              this.callPhoneNumber.length - 1,
             );
           }
         },
@@ -995,6 +994,12 @@
               break;
             case "INCOMING_CALL":
               this.callEndInfo = undefined;
+              this.statusIsring = true;
+              this.callDirection = data.direction;
+              if (this.autoAnswer) {
+                //自动应答
+                this.sipClient.answer();
+              }
             // this.playRingMedia();
             case "OUTGOING_CALL":
               this.callEndInfo = undefined;
@@ -1004,10 +1009,6 @@
               this.callDirection = data.direction;
               this.discaller = data.otherLegNumber;
               this.discallee = this.agentNo;
-              if (this.autoAnswer) {
-                //自动应答
-                this.sipClient.answer();
-              }
               break;
             case "IN_CALL":
               if (this.autoDisableMic) {
@@ -1122,7 +1123,7 @@
           if (window.electronAPI) {
             window.electronAPI.createNotification(
               "来电提醒",
-              "您有一通电话正在呼入"
+              "您有一通电话正在呼入",
             );
           }
           this.stopPlayRingMedia();
@@ -1152,13 +1153,13 @@
         accountGet(accountKey) {
           return (
             this.accountGetAll().find(
-              (account) => account.host + account.extNo === accountKey
+              (account) => account.host + account.extNo === accountKey,
             ) || null
           );
         },
         accountDel(accountKey) {
           const accounts = this.accountGetAll().filter(
-            (account) => account.host + account.extNo !== accountKey
+            (account) => account.host + account.extNo !== accountKey,
           );
           storage.set("historyAccounts", accounts);
           this.accountGetAll();
@@ -1191,7 +1192,7 @@
           this.historyAccounts = accounts;
           const lastAccount = localStorage.getItem("lastAccount");
           this.useHistoryAccounts(
-            lastAccount || accounts[0].host + accounts[0].extNo
+            lastAccount || accounts[0].host + accounts[0].extNo,
           );
         },
         saveHistoryAccounts() {
