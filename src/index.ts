@@ -211,7 +211,7 @@ export default class SipCall {
 
           this.ua = new jssip.UA({
             sockets: [this.socket],
-            uri: "sip:" + config.extNo + "@" + config.domain,
+            uri: "sip:" + config.extNo + "@" + r.host,
             password: config.extPwd,
             register: false,
             register_expires: 15,
@@ -256,6 +256,7 @@ export default class SipCall {
             this.onChangeState(State.REGISTER_FAILED, {
               msg: "注册失败:" + e.cause,
             });
+            this.sipSocket?.logout();
             this.ua.stop();
           });
           //Fired a few seconds before the registration expires

@@ -27,7 +27,7 @@ class SipSocket {
     port: string,
     username: string,
     password: string,
-    kick: () => void // 接受kick操作
+    kick: () => void, // 接受kick操作
   ) {
     const baseUrl =
       (protocol ? "wss" : "ws") + "://" + host + ":" + port + "/api/sdk/ws";
@@ -91,6 +91,12 @@ class SipSocket {
         kick();
       }
     };
+
+    // 当sock断开时
+    this.client.onclose = () => {
+      this.loginStatus = false;
+      kick();
+    };
   }
 
   // 没2两秒检测一次登录状态
@@ -135,7 +141,7 @@ class SipSocket {
           password: md5(timestamp + password + nonce),
           nonce,
         },
-      })
+      }),
     );
     // 发起第一次心跳检测
     setTimeout(() => {
