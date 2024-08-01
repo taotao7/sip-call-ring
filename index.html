@@ -957,7 +957,7 @@
           if (this.callPhoneNumber && this.callPhoneNumber.length > 0) {
             this.callPhoneNumber = this.callPhoneNumber.substring(
               0,
-              this.callPhoneNumber.length - 1,
+              this.callPhoneNumber.length - 1
             );
           }
         },
@@ -1123,7 +1123,7 @@
           if (window.electronAPI) {
             window.electronAPI.createNotification(
               "来电提醒",
-              "您有一通电话正在呼入",
+              "您有一通电话正在呼入"
             );
           }
           this.stopPlayRingMedia();
@@ -1153,13 +1153,13 @@
         accountGet(accountKey) {
           return (
             this.accountGetAll().find(
-              (account) => account.host + account.extNo === accountKey,
+              (account) => account.host + account.extNo === accountKey
             ) || null
           );
         },
         accountDel(accountKey) {
           const accounts = this.accountGetAll().filter(
-            (account) => account.host + account.extNo !== accountKey,
+            (account) => account.host + account.extNo !== accountKey
           );
           storage.set("historyAccounts", accounts);
           this.accountGetAll();
@@ -1192,7 +1192,7 @@
           this.historyAccounts = accounts;
           const lastAccount = localStorage.getItem("lastAccount");
           this.useHistoryAccounts(
-            lastAccount || accounts[0].host + accounts[0].extNo,
+            lastAccount || accounts[0].host + accounts[0].extNo
           );
         },
         saveHistoryAccounts() {
@@ -1253,6 +1253,7 @@
             return;
           }
           this.sipClient.transferCall(this.transferNumber);
+          this.dialogVisible = false;
         },
         handleClose() {
           this.transferNumber = "";

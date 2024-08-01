@@ -196,7 +196,7 @@ export default class SipCall {
         config.extNo,
         config.extPwd,
         //这里监听到action 为kick就断开
-        this.unregister.bind(this),
+        this.unregister.bind(this)
       );
       this.sipSocket
         .checkLogin()
@@ -371,7 +371,7 @@ export default class SipCall {
                 this.stopAudio();
                 this.onChangeState(State.IN_CALL, null);
               });
-            },
+            }
           );
 
           this.ua.on(
@@ -384,7 +384,7 @@ export default class SipCall {
               s.on("failed", (evt) => {
                 // console.log("newMessage-succeeded:", data)
               });
-            },
+            }
           );
 
           //启动UA
@@ -467,7 +467,7 @@ export default class SipCall {
         }
         if (this.currentStatReport.roundTripTime != undefined) {
           ls.latencyTime = Math.floor(
-            this.currentStatReport.roundTripTime * 1000,
+            this.currentStatReport.roundTripTime * 1000
           );
         }
         console.debug(
@@ -476,7 +476,7 @@ export default class SipCall {
             "% / " +
             (ls.downLossRate * 100).toFixed(2) +
             "%",
-          "延迟:" + ls.latencyTime.toFixed(2) + "ms",
+          "延迟:" + ls.latencyTime.toFixed(2) + "ms"
         );
         this.onChangeState(State.LATENCY_STAT, ls);
       });
@@ -524,7 +524,7 @@ export default class SipCall {
 
   private onChangeState(
     event: String,
-    data: StateListenerMessage | CallEndEvent | LatencyStat | null,
+    data: StateListenerMessage | CallEndEvent | LatencyStat | null
   ) {
     if (undefined === this.stateEventListener) {
       return;
@@ -837,7 +837,6 @@ export default class SipCall {
 
   public transferCall(phone: string) {
     this.sipSocket?.transfer(phone);
-    this.sipSocket?.refreshToken();
   }
 
   public playAudio() {
