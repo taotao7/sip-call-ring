@@ -95,7 +95,6 @@ class SipSocket {
     // 当sock断开时
     this.client.onclose = () => {
       this.loginStatus = false;
-      kick();
     };
   }
 
