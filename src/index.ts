@@ -319,6 +319,10 @@ export default class SipCall {
               s.on("progress", (evt: IncomingEvent | OutgoingEvent) => {
                 // console.info('通话振铃-->通话振铃')
                 //s.remote_identity.display_name
+                if ([180, 183].includes((evt as OutgoingEvent)?.response?.status_code)) {
+                       this.sipSocket?.onDialing();
+                }
+                // 拨打电话后告知server状态变动
                 this.onChangeState(currentEvent, {
                   direction: this.direction,
                   otherLegNumber: data.request.from.uri.user,
@@ -610,8 +614,6 @@ export default class SipCall {
   //发起呼叫
   public call = (phone: string, param: CallExtraParam = {}): String => {
     this.micCheck();
-    // 拨打电话后告知server状态变动
-    this.sipSocket?.onDialing();
     //注册情况下发起呼叫
     this.currentCallId = uuidv4();
     if (this.ua && this.ua.isRegistered()) {

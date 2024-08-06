@@ -924,13 +924,13 @@
         makeCall() {
           console.log("点击拨打按钮");
           this.callEndInfo = undefined;
-          if (this.callPhoneNumber.length <= 2) {
-            this.$message({
-              message: this.$t("message.theCalledWasNotEntered"),
-              type: "warning",
-            });
-            return;
-          }
+          // if (this.callPhoneNumber.length <= 2) {
+            // this.$message({
+            //   message: this.$t("message.theCalledWasNotEntered"),
+            //   type: "warning",
+            // });
+            // return;
+          // }
           localStorage.setItem("callPhoneNumber", this.callPhoneNumber);
           this.discallee = this.callPhoneNumber;
           let callId = this.sipClient.call(this.callPhoneNumber.trim());
