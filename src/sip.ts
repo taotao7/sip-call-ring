@@ -7,6 +7,7 @@ class SipSocket {
   client: WebSocket;
   status: number = 0;
   loginStatus: boolean = false;
+  exitStatus: boolean = false;
   loginInfo: {
     username: string;
     password: string;
@@ -95,7 +96,7 @@ class SipSocket {
     // 当sock断开时
     this.client.onclose = () => {
       this.loginStatus = false;
-      kick();
+      if (!this.exitStatus) kick();
     };
   }
 
@@ -150,6 +151,7 @@ class SipSocket {
   }
 
   public logout() {
+    this.exitStatus = true;
     this.client.send(JSON.stringify({ action: "logout", actionId: "" }));
   }
 
