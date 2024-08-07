@@ -319,8 +319,12 @@ export default class SipCall {
               s.on("progress", (evt: IncomingEvent | OutgoingEvent) => {
                 // console.info('通话振铃-->通话振铃')
                 //s.remote_identity.display_name
-                if ([180, 183].includes((evt as OutgoingEvent)?.response?.status_code)) {
-                       this.sipSocket?.onDialing();
+                if (
+                  [180, 183].includes(
+                    (evt as OutgoingEvent)?.response?.status_code
+                  )
+                ) {
+                  this.sipSocket?.onDialing();
                 }
                 // 拨打电话后告知server状态变动
                 this.onChangeState(currentEvent, {
@@ -829,16 +833,16 @@ export default class SipCall {
 
   // 设置为小休
   public setResting() {
-    this.sipSocket?.onResting();
+    return this.sipSocket?.onResting();
   }
 
   // 设置为空闲
   public setIdle() {
-    this.sipSocket?.onIdle();
+    return this.sipSocket?.onIdle();
   }
 
   public transferCall(phone: string) {
-    this.sipSocket?.transfer(phone);
+    return this.sipSocket?.transfer(phone);
   }
 
   public playAudio() {
