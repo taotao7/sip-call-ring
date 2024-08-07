@@ -89,6 +89,7 @@ class SipSocket {
       if (res?.code === 0 && res?.data?.action === "kick") {
         this.loginStatus = false;
         this.client.close();
+        this.auth.token = "";
         kick();
       }
     };
@@ -96,6 +97,7 @@ class SipSocket {
     // 当sock断开时
     this.client.onclose = () => {
       this.loginStatus = false;
+      this.auth.token = "";
       if (!this.exitStatus) kick();
     };
   }
@@ -152,6 +154,7 @@ class SipSocket {
 
   public logout() {
     this.exitStatus = true;
+    this.auth.token = "";
     this.client.send(JSON.stringify({ action: "logout", actionId: "" }));
   }
 
