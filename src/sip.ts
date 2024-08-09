@@ -5,7 +5,6 @@ import { ofetch, $Fetch } from "ofetch";
 class SipSocket {
   apiServer: $Fetch;
   client: WebSocket;
-  status: number = 0;
   loginStatus: boolean = false;
   exitStatus: boolean = false;
   loginInfo: {
@@ -17,10 +16,10 @@ class SipSocket {
     refreshToken: string;
     expireAt: number;
   } = {
-    token: "",
-    refreshToken: "",
-    expireAt: 0,
-  };
+      token: "",
+      refreshToken: "",
+      expireAt: 0,
+    };
 
   constructor(
     protocol: boolean,
@@ -28,7 +27,9 @@ class SipSocket {
     port: string,
     username: string,
     password: string,
-    kick: () => void // 接受kick操作
+    kick: () => void, // 接受kick操作
+    statusListener: (v: number) => void, // 接受状态
+    callbackInfo: (v: any) => void // 接受callback info
   ) {
     const baseUrl =
       (protocol ? "wss" : "ws") + "://" + host + ":" + port + "/api/sdk/ws";
@@ -58,10 +59,10 @@ class SipSocket {
         }
       },
     });
-    this.listen(kick);
+    this.listen(kick, statusListener, callbackInfo);
   }
 
-  public listen(kick: () => void) {
+  public listen(kick: () => void, statusListener: (v: number) => void, callbackInfo: (v: any) => void) {
     this.client.onopen = () => {
       this.login();
     };
@@ -83,8 +84,14 @@ class SipSocket {
 
       // 接受服务端的状态
       if (res?.code === 0 && res?.data?.action === "status") {
-        this.status = res.data.status;
+        statusListener(res.data.status);
       }
+
+      // 接受callback info
+      if (res?.code === 0 && res?.data?.action === "numberInfo") {
+        callbackInfo({ extraInfo: res.data.extraInfo, number: res.data.number })
+      }
+
       // kick 被踢出就关闭连接
       if (res?.code === 0 && res?.data?.action === "kick") {
         this.loginStatus = false;
@@ -92,6 +99,7 @@ class SipSocket {
         this.auth.token = "";
         kick();
       }
+
     };
 
     // 当sock断开时

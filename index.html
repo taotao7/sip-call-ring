@@ -883,10 +883,6 @@
           this.mediaDevices = res;
         });
 
-        // 实时更新sip status状态
-        setInterval(() => {
-          this.sipStatus = this.sipClient?.getSipStatus();
-        }, 2000);
       },
       methods: {
         login() {
@@ -903,7 +899,10 @@
           }
           this.saveHistoryAccounts();
           this.loading = this.$loading({ text: "loading..." });
-          this.sipClient = new SipCall(this.configuration);
+          this.sipClient = new SipCall({...this.configuration,
+                        stateEventListener: this.stateEventListener,
+            callbackInfo
+          });
         },
         logout() {
           console.log("点击退出按钮");

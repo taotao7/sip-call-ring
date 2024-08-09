@@ -31,6 +31,8 @@ interface InitConfig {
   autoRegister: boolean;
   debug?: boolean;
   stateEventListener: Function;
+  statusListener: (status: number) => void;
+  callbackInfo: (info: any) => void;
 }
 
 interface StunConfig {
@@ -196,7 +198,9 @@ export default class SipCall {
         config.extNo,
         config.extPwd,
         //这里监听到action 为kick就断开
-        this.unregister.bind(this)
+        this.unregister.bind(this),
+        config.statusListener,
+        config.callbackInfo
       );
       this.sipSocket
         .checkLogin()
@@ -480,10 +484,10 @@ export default class SipCall {
         }
         console.debug(
           "上行/下行(丢包率):" +
-            (ls.upLossRate * 100).toFixed(2) +
-            "% / " +
-            (ls.downLossRate * 100).toFixed(2) +
-            "%",
+          (ls.upLossRate * 100).toFixed(2) +
+          "% / " +
+          (ls.downLossRate * 100).toFixed(2) +
+          "%",
           "延迟:" + ls.latencyTime.toFixed(2) + "ms"
         );
         this.onChangeState(State.LATENCY_STAT, ls);
@@ -808,8 +812,8 @@ export default class SipCall {
       };
     } catch (e) {
       return {
-        yes: () => {},
-        no: () => {},
+        yes: () => { },
+        no: () => { },
       };
     }
   }
@@ -820,15 +824,6 @@ export default class SipCall {
       return [];
     }
     return await navigator.mediaDevices.enumerateDevices();
-  }
-
-  // 坐席相关功能
-  public getSipStatus() {
-    if (this.sipSocket?.status) {
-      return this.sipSocket.status;
-    } else {
-      return 0;
-    }
   }
 
   // 设置为小休
