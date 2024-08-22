@@ -62,18 +62,20 @@ class SipSocket {
     this.listen(kick, statusListener, callbackInfo);
   }
 
-  public listen(kick: () => void, statusListener: (v: number) => void, callbackInfo: (v: any) => void) {
+  public listen(
+    kick: () => void,
+    statusListener: (v: number) => void,
+    callbackInfo: (v: any) => void
+  ) {
     this.client.onopen = () => {
       this.login();
     };
     this.client.onmessage = (event) => {
       const res = JSON.parse(event.data);
       // 心跳
-      if (res?.message === "pong") {
-        setTimeout(() => {
-          this.client.send(JSON.stringify({ action: "ping" }));
-        }, 2000);
-      }
+      setTimeout(() => {
+        this.client.send(JSON.stringify({ action: "ping" }));
+      }, 2000);
 
       if (res?.code === 0 && res?.data && res?.data?.token) {
         this.auth.token = res.data.token;
@@ -89,7 +91,10 @@ class SipSocket {
 
       // 接受callback info
       if (res?.code === 0 && res?.data?.action === "numberInfo") {
-        callbackInfo({ extraInfo: res.data.extraInfo, number: res.data.number })
+        callbackInfo({
+          extraInfo: res.data.extraInfo,
+          number: res.data.number,
+        });
       }
 
       // kick 被踢出就关闭连接
@@ -99,7 +104,6 @@ class SipSocket {
         this.auth.token = "";
         kick();
       }
-
     };
 
     // 当sock断开时
