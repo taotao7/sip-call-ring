@@ -16,10 +16,10 @@ class SipSocket {
     refreshToken: string;
     expireAt: number;
   } = {
-    token: "",
-    refreshToken: "",
-    expireAt: 0,
-  };
+      token: "",
+      refreshToken: "",
+      expireAt: 0,
+    };
 
   constructor(
     protocol: boolean,
@@ -72,10 +72,6 @@ class SipSocket {
     };
     this.client.onmessage = (event) => {
       const res = JSON.parse(event.data);
-      // 心跳
-      setTimeout(() => {
-        this.client.send(JSON.stringify({ action: "ping" }));
-      }, 2000);
 
       if (res?.code === 0 && res?.data && res?.data?.token) {
         this.auth.token = res.data.token;
