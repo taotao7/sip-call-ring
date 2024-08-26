@@ -16,10 +16,10 @@ class SipSocket {
     refreshToken: string;
     expireAt: number;
   } = {
-      token: "",
-      refreshToken: "",
-      expireAt: 0,
-    };
+    token: "",
+    refreshToken: "",
+    expireAt: 0,
+  };
 
   constructor(
     protocol: boolean,
@@ -158,9 +158,13 @@ class SipSocket {
         },
       })
     );
+  }
+
+  public heartBeat() {
+    this.client.send(JSON.stringify({ action: "ping" }));
     // 发起第一次心跳检测
     setTimeout(() => {
-      this.client.send(JSON.stringify({ action: "ping" }));
+      this.heartBeat();
     }, 2000);
   }
 
