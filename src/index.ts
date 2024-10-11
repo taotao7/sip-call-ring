@@ -56,10 +56,10 @@ interface RTCIceServer {
 
 interface StateListenerMessage {
   msg?: string;
-  localAgent?: String;
+  localAgent?: string;
   direction?: CallDirection; //呼叫方向
-  otherLegNumber?: String;
-  callId?: String;
+  otherLegNumber?: string;
+  callId?: string;
 
   latencyTime?: number | undefined; //网络延迟(ms)
   upLossRate?: number | undefined; //上行-丢包率
@@ -80,7 +80,7 @@ interface NetworkLatencyStat {
 
 interface CallExtraParam {
   outNumber?: string;
-  businessId?: String;
+  businessId?: string;
 }
 
 interface CallEndEvent {
@@ -130,7 +130,7 @@ export default class SipCall {
   private socket!: jssip.WebSocketInterface;
 
   //当前坐席号码
-  private localAgent: String;
+  private localAgent: string;
   //呼叫中session:呼出、呼入、当前
   private outgoingSession: RTCSession | undefined;
   private incomingSession: RTCSession | undefined;
@@ -138,9 +138,9 @@ export default class SipCall {
   //呼叫方向 outbound:呼出/inbound:呼入
   private direction: CallDirection | undefined;
   //对方号码
-  private otherLegNumber: String | undefined;
+  private otherLegNumber: string | undefined;
   //当前通话uuid
-  private currentCallId: String | undefined;
+  private currentCallId: string | undefined;
 
   //当前通话的网络延迟统计定时器(每秒钟获取网络情况)
   private currentLatencyStatTimer: NodeJS.Timer | undefined;
@@ -275,7 +275,7 @@ export default class SipCall {
             (data: IncomingRTCSessionEvent | OutgoingRTCSessionEvent) => {
               // console.info('on new rtcsession: ', data)
               let s = data.session;
-              let currentEvent: String;
+              let currentEvent: string;
               if (data.originator === "remote") {
                 //来电处理
                 //console.info('>>>>>>>>>>>>>>>>>>>>来电>>>>>>>>>>>>>>>>>>>>')
@@ -484,10 +484,10 @@ export default class SipCall {
         }
         console.debug(
           "上行/下行(丢包率):" +
-          (ls.upLossRate * 100).toFixed(2) +
-          "% / " +
-          (ls.downLossRate * 100).toFixed(2) +
-          "%",
+            (ls.upLossRate * 100).toFixed(2) +
+            "% / " +
+            (ls.downLossRate * 100).toFixed(2) +
+            "%",
           "延迟:" + ls.latencyTime.toFixed(2) + "ms"
         );
         this.onChangeState(State.LATENCY_STAT, ls);
@@ -535,7 +535,7 @@ export default class SipCall {
   }
 
   private onChangeState(
-    event: String,
+    event: string,
     data: StateListenerMessage | CallEndEvent | LatencyStat | null
   ) {
     if (undefined === this.stateEventListener) {
@@ -812,8 +812,8 @@ export default class SipCall {
       };
     } catch (e) {
       return {
-        yes: () => { },
-        no: () => { },
+        yes: () => {},
+        no: () => {},
       };
     }
   }
