@@ -490,6 +490,9 @@ export default class SipCall {
             "%",
           "延迟:" + ls.latencyTime.toFixed(2) + "ms"
         );
+        if (ls.downAudioLevel > 0) {
+          this.stopAudio();
+        }
         this.onChangeState(State.LATENCY_STAT, ls);
       });
     }, 1000);
