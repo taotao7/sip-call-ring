@@ -6,3 +6,5 @@ node_modules
 lib
 yarn.lock
 .DS_Store
+.aider*
+.env

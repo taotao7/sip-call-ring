@@ -127,7 +127,7 @@ export default class SipCall {
   private audioView = document.createElement("audio");
 
   private ua!: jssip.UA;
-  private socket!: jssip.WebSocketInterface;
+  private socket!: jssip.WebSocketInterface | null;
 
   //当前坐席号码
   private localAgent: string;
@@ -236,6 +236,7 @@ export default class SipCall {
           //websocket连接失败
           this.ua.on("disconnected", (e: any) => {
             this.ua.stop();
+            this.socket = null;
             if (e.error) {
               this.onChangeState(State.DISCONNECTED, e.reason);
             }
@@ -262,6 +263,7 @@ export default class SipCall {
             });
             this.sipSocket?.logout();
             this.ua.stop();
+            this.socket = null;
           });
           //Fired a few seconds before the registration expires
           this.ua.on("registrationExpiring", () => {
@@ -484,10 +486,10 @@ export default class SipCall {
         }
         console.debug(
           "上行/下行(丢包率):" +
-            (ls.upLossRate * 100).toFixed(2) +
-            "% / " +
-            (ls.downLossRate * 100).toFixed(2) +
-            "%",
+          (ls.upLossRate * 100).toFixed(2) +
+          "% / " +
+          (ls.downLossRate * 100).toFixed(2) +
+          "%",
           "延迟:" + ls.latencyTime.toFixed(2) + "ms"
         );
         if (ls.downAudioLevel > 0) {
@@ -574,6 +576,7 @@ export default class SipCall {
     if (this.ua && this.ua.isConnected() && this.ua.isRegistered()) {
       this.sipSocket?.logout();
       this.ua.unregister({ all: true });
+      this.socket = null;
     } else {
       this.onChangeState(State.ERROR, { msg: "尚未注册，操作禁止." });
     }
@@ -815,8 +818,8 @@ export default class SipCall {
       };
     } catch (e) {
       return {
-        yes: () => {},
-        no: () => {},
+        yes: () => { },
+        no: () => { },
       };
     }
   }

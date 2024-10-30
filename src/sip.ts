@@ -16,10 +16,10 @@ class SipSocket {
     refreshToken: string;
     expireAt: number;
   } = {
-      token: "",
-      refreshToken: "",
-      expireAt: 0,
-    };
+    token: "",
+    refreshToken: "",
+    expireAt: 0,
+  };
 
   constructor(
     protocol: boolean,
