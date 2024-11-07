@@ -93,6 +93,12 @@ class SipSocket {
         });
       }
 
+      if (res?.code === 0 && res?.data?.action === "ping") {
+        this.client.send(
+          JSON.stringify({ action: "pong", actionId: res?.data?.actionId })
+        );
+      }
+
       // kick 被踢出就关闭连接
       if (res?.code === 0 && res?.data?.action === "kick") {
         this.loginStatus = false;
