@@ -20,6 +20,7 @@ class SipSocket {
     refreshToken: "",
     expireAt: 0,
   };
+  private heartbeatTimer: NodeJS.Timeout | null = null;
 
   constructor(
     protocol: boolean,
@@ -70,7 +71,7 @@ class SipSocket {
     this.client.onopen = () => {
       this.login();
     };
-    this.client.onmessage = (event) => {
+    this.client.onmessage = (event: any) => {
       const res = JSON.parse(event.data);
 
       if (res?.code === 0 && res?.data && res?.data?.token) {
@@ -112,6 +113,7 @@ class SipSocket {
     this.client.onclose = () => {
       this.loginStatus = false;
       this.auth.token = "";
+      this.clearHeartbeat();
       if (!this.exitStatus) kick();
     };
   }
@@ -164,17 +166,29 @@ class SipSocket {
   }
 
   public heartBeat() {
-    this.client.send(JSON.stringify({ action: "ping" }));
-    // 发起第一次心跳检测
-    setTimeout(() => {
-      this.heartBeat();
-    }, 2000);
+    if (this.client.readyState === WebSocket.OPEN) {
+      this.client.send(JSON.stringify({ action: "ping" }));
+      this.heartbeatTimer = setTimeout(() => {
+        this.heartBeat();
+      }, 2000);
+    }
+  }
+
+  // 在需要停止心跳的地方（如logout或连接关闭时）清除定时器
+  private clearHeartbeat() {
+    if (this.heartbeatTimer) {
+      clearTimeout(this.heartbeatTimer);
+      this.heartbeatTimer = null;
+    }
   }
 
   public logout() {
     this.exitStatus = true;
     this.auth.token = "";
-    this.client.send(JSON.stringify({ action: "logout", actionId: "" }));
+    if (this.client.readyState === WebSocket.OPEN) {
+      this.client.send(JSON.stringify({ action: "logout", actionId: "" }));
+    }
+    this.clearHeartbeat();
   }
 
   private async getSipWebrtcAddr() {

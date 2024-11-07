@@ -486,10 +486,10 @@ export default class SipCall {
         }
         console.debug(
           "上行/下行(丢包率):" +
-          (ls.upLossRate * 100).toFixed(2) +
-          "% / " +
-          (ls.downLossRate * 100).toFixed(2) +
-          "%",
+            (ls.upLossRate * 100).toFixed(2) +
+            "% / " +
+            (ls.downLossRate * 100).toFixed(2) +
+            "%",
           "延迟:" + ls.latencyTime.toFixed(2) + "ms"
         );
         if (ls.downAudioLevel > 0) {
@@ -818,8 +818,8 @@ export default class SipCall {
       };
     } catch (e) {
       return {
-        yes: () => { },
-        no: () => { },
+        yes: () => {},
+        no: () => {},
       };
     }
   }
