@@ -30,7 +30,8 @@ class SipSocket {
     password: string,
     kick: () => void, // 接受kick操作
     statusListener: (v: number) => void, // 接受状态
-    callbackInfo: (v: any) => void // 接受callback info
+    callbackInfo: (v: any) => void, // 接受callback info
+    groupCallNotify: (v: any) => void // 接受groupCallNotify
   ) {
     const baseUrl =
       (protocol ? "wss" : "ws") + "://" + host + ":" + port + "/api/sdk/ws";
@@ -60,13 +61,14 @@ class SipSocket {
         }
       },
     });
-    this.listen(kick, statusListener, callbackInfo);
+    this.listen(kick, statusListener, callbackInfo, groupCallNotify);
   }
 
   public listen(
     kick: () => void,
     statusListener: (v: number) => void,
-    callbackInfo: (v: any) => void
+    callbackInfo: (v: any) => void,
+    groupCallNotify: (v: any) => void
   ) {
     this.client.onopen = () => {
       this.login();
@@ -106,6 +108,14 @@ class SipSocket {
         this.client.close();
         this.auth.token = "";
         kick();
+      }
+
+      // 接受groupCallNotify
+      if (res?.code === 0 && res.data.action === "groupCallNotify") {
+        groupCallNotify({
+          ...res.data.data,
+          type: res.data.type,
+        });
       }
     };
 
