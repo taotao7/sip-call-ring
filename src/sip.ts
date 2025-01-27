@@ -34,9 +34,19 @@ class SipSocket {
     groupCallNotify: (v: any) => void // 接受groupCallNotify
   ) {
     const baseUrl =
-      (protocol ? "wss" : "ws") + "://" + host + ":" + port + "/api/sdk/ws";
+      (protocol ? "wss" : "ws") +
+      "://" +
+      host +
+      ":" +
+      port +
+      "/agent-workbench/api/ws";
     const apiServer =
-      (protocol ? "https" : "http") + "://" + host + ":" + port + "/api/sdk";
+      (protocol ? "https" : "http") +
+      "://" +
+      host +
+      ":" +
+      port +
+      "/api";
     this.loginInfo = {
       username,
       password,
@@ -76,34 +86,31 @@ class SipSocket {
     this.client.onmessage = (event: any) => {
       const res = JSON.parse(event.data);
 
-      if (res?.code === 0 && res?.data && res?.data?.token) {
-        this.auth.token = res.data.token;
-        this.auth.refreshToken = res.data.refreshToken;
-        this.auth.expireAt = res.data.expireAt;
+      if (res?.action === "auth" && res?.content) {
+        this.auth.token = res?.content?.token;
+        this.auth.refreshToken = res?.content?.refreshToken;
+        this.auth.expireAt = res?.content?.expireAt;
         this.loginStatus = true;
       }
 
       // 接受服务端的状态
-      if (res?.code === 0 && res?.data?.action === "status") {
-        statusListener(res.data.status);
+      if (res?.action === "status") {
+        statusListener(res?.content);
       }
 
       // 接受callback info
-      if (res?.code === 0 && res?.data?.action === "numberInfo") {
+      if (res?.action === "numberInfo") {
         callbackInfo({
-          extraInfo: res.data.extraInfo,
-          number: res.data.number,
+          ...res?.content,
         });
       }
 
-      if (res?.code === 0 && res?.data?.action === "ping") {
-        this.client.send(
-          JSON.stringify({ action: "pong", actionId: res?.data?.actionId })
-        );
+      if (res?.action === "ping") {
+        this.client.send(JSON.stringify({ action: "pong" }));
       }
 
       // kick 被踢出就关闭连接
-      if (res?.code === 0 && res?.data?.action === "kick") {
+      if (res?.action === "kick") {
         this.loginStatus = false;
         this.client.close();
         this.auth.token = "";
@@ -111,10 +118,9 @@ class SipSocket {
       }
 
       // 接受groupCallNotify
-      if (res?.code === 0 && res.data.action === "groupCallNotify") {
+      if (res?.action === "groupCallNotify") {
         groupCallNotify({
-          ...res.data.data,
-          type: res.data.type,
+          ...res?.content,
         });
       }
     };
@@ -202,14 +208,14 @@ class SipSocket {
   }
 
   private async getSipWebrtcAddr() {
-    return this.apiServer("/webrtc/addr", {
+    return this.apiServer("/call-center/agent-workbench/sdk/agent/webrtc/addr", {
       method: "GET",
       parseResponse: JSON.parse,
     });
   }
 
   public onDialing() {
-    return this.apiServer("/agent/status/switch", {
+    return this.apiServer("/call-center/agent-workbench/sdk/agent/status/switch", {
       method: "POST",
       body: {
         action: 5,
@@ -218,7 +224,7 @@ class SipSocket {
   }
 
   public onResting() {
-    return this.apiServer("/agent/status/switch", {
+    return this.apiServer("/call-center/agent-workbench/sdk/agent/status/switch", {
       method: "POST",
       body: {
         action: 6,
@@ -227,7 +233,7 @@ class SipSocket {
   }
 
   public onIdle() {
-    return this.apiServer("/agent/status/switch", {
+    return this.apiServer("/call-center/agent-workbench/sdk/agent/status/switch", {
       method: "POST",
       body: {
         action: 2,
@@ -235,8 +241,17 @@ class SipSocket {
     });
   }
 
+  public onBusy() {
+    return this.apiServer("/call-center/agent-workbench/sdk/agent/status/switch", {
+      method: "POST",
+      body: {
+        action: 7,
+      },
+    });
+  }
+
   public transfer(num: string) {
-    return this.apiServer("/call/transfer", {
+    return this.apiServer("/call-center/agent-workbench/sdk/agent/call/transfer", {
       method: "POST",
       body: {
         transferTo: num,
@@ -245,7 +260,7 @@ class SipSocket {
   }
 
   public async refreshToken() {
-    const res = await this.apiServer("/token/refresh", {
+    const res = await this.apiServer("/basic/agent-workbench/sdk/agent/token/refresh", {
       method: "POST",
       body: {
         refreshToken: this.auth.refreshToken,

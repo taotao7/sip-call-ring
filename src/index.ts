@@ -641,6 +641,8 @@ export default class SipCall {
         if (param.outNumber) {
           extraHeaders.push("X-JOutNumber: " + param.outNumber);
         }
+        extraHeaders.push("x-call_center_type: " + "OUTBOUND_CALL");
+        extraHeaders.push("x-agent_channel: " + this.localAgent);
       }
       this.outgoingSession = this.ua.call(phone, {
         eventHandlers: {
@@ -846,6 +848,11 @@ export default class SipCall {
 
   public transferCall(phone: string) {
     return this.sipSocket?.transfer(phone);
+  }
+
+  // 设置为忙碌
+  public setBusy() {
+    return this.sipSocket?.onBusy();
   }
 
   public playAudio() {
