@@ -34,6 +34,7 @@ interface InitConfig {
   statusListener: (status: number) => void;
   callbackInfo: (info: any) => void;
   groupCallNotify: (info: any) => void;
+  otherEvent: (info: any) => void;
 }
 
 interface StunConfig {
@@ -202,7 +203,8 @@ export default class SipCall {
         this.unregister.bind(this),
         config.statusListener,
         config.callbackInfo,
-        config.groupCallNotify
+        config.groupCallNotify,
+        config.otherEvent
       );
       this.sipSocket
         .checkLogin()
