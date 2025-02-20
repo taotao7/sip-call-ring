@@ -11,7 +11,7 @@ class SipSocket {
     username: string;
     password: string;
   };
-  public auth: {
+  auth: {
     token: string;
     refreshToken: string;
     expireAt: number;
