@@ -153,7 +153,7 @@ export default class SipCall {
 
   private stunConfig: StunConfig | undefined;
   // websocks client
-  private sipSocket: SipSocket | undefined;
+  public sipSocket: SipSocket | undefined;
 
   //构造函数-初始化SDK
   constructor(config: InitConfig) {
