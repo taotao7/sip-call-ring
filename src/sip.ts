@@ -310,15 +310,6 @@ class SipSocket {
     );
   }
 
-  public getInComingNumberInfo() {
-    return this.apiServer(
-      "/call-center/agent-workbench/sdk/agent/call/current",
-      {
-        method: "GET",
-      }
-    );
-  }
-
   public getOrgOnlineAgent() {
     return this.apiServer("/call-center/agent-workbench/sdk/agent/org/agents", {
       method: "GET",

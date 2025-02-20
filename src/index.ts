@@ -857,10 +857,6 @@ export default class SipCall {
     return this.sipSocket?.onBusy();
   }
 
-  public getInComingNumberInfo() {
-    return this.sipSocket?.getInComingNumberInfo();
-  }
-
   public getOrgOnlineAgent() {
     return this.sipSocket?.getOrgOnlineAgent();
   }
