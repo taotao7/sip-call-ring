@@ -857,6 +857,22 @@ export default class SipCall {
     return this.sipSocket?.onBusy();
   }
 
+  public getInComingNumberInfo() {
+    return this.sipSocket?.getInComingNumberInfo();
+  }
+
+  public getOrgOnlineAgent() {
+    return this.sipSocket?.getOrgOnlineAgent();
+  }
+
+  public wrapUp(seconds: number) {
+    return this.sipSocket?.wrapUp(seconds);
+  }
+
+  public wrapUpCancel() {
+    return this.sipSocket?.wrapUpCancel();
+  }
+
   public playAudio() {
     let ringAudio = document.getElementById("ringMediaAudioId");
     if (!ringAudio) {

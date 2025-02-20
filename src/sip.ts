@@ -288,6 +288,43 @@ class SipSocket {
     );
   }
 
+  public wrapUp(seconds: number) {
+    return this.apiServer(
+      "/call-center/agent-workbench/sdk/agent/wrap-up/extend",
+      {
+        method: "POST",
+        body: {
+          seconds: seconds,
+        },
+      }
+    );
+  }
+
+  public wrapUpCancel() {
+    return this.apiServer(
+      "/call-center/agent-workbench/sdk/agent/wrap-up/cancel",
+      {
+        method: "POST",
+        body: null,
+      }
+    );
+  }
+
+  public getInComingNumberInfo() {
+    return this.apiServer(
+      "/call-center/agent-workbench/sdk/agent/call/current",
+      {
+        method: "GET",
+      }
+    );
+  }
+
+  public getOrgOnlineAgent() {
+    return this.apiServer("/call-center/agent-workbench/sdk/agent/org/agents", {
+      method: "GET",
+    });
+  }
+
   public async refreshToken() {
     const res = await this.apiServer(
       "/basic/agent-workbench/sdk/agent/token/refresh",
