@@ -30,7 +30,7 @@ interface InitConfig {
   stun?: StunConfig;
   autoRegister: boolean;
   debug?: boolean;
-  stateEventListener: Function;
+  stateEventListener: Function | undefined;
   statusListener: (status: number) => void;
   callbackInfo: (info: any) => void;
   groupCallNotify: (info: any) => void;
@@ -589,8 +589,15 @@ export default class SipCall {
   //清理sdk初始化内容
   private cleanSDK() {
     //清理sdk
+    this.stopAudio();
     this.cleanCallingData();
-    this.ua.stop();
+    if (this.ua) {
+      this.ua.stop();
+    }
+
+    if (this.socket) {
+      this.socket = null;
+    }
   }
 
   public sendMessage = (target: string, content: string) => {

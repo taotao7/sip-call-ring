@@ -1,6 +1,10 @@
 import md5 from "blueimp-md5";
 import { ofetch, $Fetch } from "ofetch";
 
+const HEARTBEAT_INTERVAL = 2000;
+const LOGIN_TIMEOUT = 10000;
+const TOKEN_REFRESH_THRESHOLD = 1000 * 60 * 90;
+
 // 坐席用
 class SipSocket {
   apiServer: $Fetch;
@@ -56,7 +60,10 @@ class SipSocket {
       },
       onRequest(context) {
         // 检查token是否需要刷新
-        if (that.auth.expireAt - new Date().getTime() < 1000 * 60 * 90) {
+        if (
+          that.auth.expireAt - new Date().getTime() <
+          TOKEN_REFRESH_THRESHOLD
+        ) {
           that.refreshToken();
         }
         if (that.auth.token) {
@@ -86,7 +93,7 @@ class SipSocket {
     this.client.onopen = () => {
       this.login();
     };
-    this.client.onmessage = (event: any) => {
+    this.client.onmessage = (event: MessageEvent) => {
       const res = JSON.parse(event.data);
 
       if (res?.action === "auth" && res?.content) {
@@ -150,7 +157,7 @@ class SipSocket {
     return new Promise<any>((resolve, reject) => {
       let start = 0;
       const timer = setInterval(async () => {
-        start += 2000;
+        start += HEARTBEAT_INTERVAL;
         if (this.loginStatus) {
           try {
             const res = await this.getSipWebrtcAddr();
@@ -165,11 +172,11 @@ class SipSocket {
             clearInterval(timer);
           }
         }
-        if (start > 10000) {
+        if (start > LOGIN_TIMEOUT) {
           reject("login timeout");
           clearInterval(timer);
         }
-      }, 2000);
+      }, HEARTBEAT_INTERVAL);
     });
   }
 
@@ -317,23 +324,27 @@ class SipSocket {
   }
 
   public async refreshToken() {
-    const res = await this.apiServer(
-      "/basic/agent-workbench/sdk/agent/token/refresh",
-      {
-        method: "POST",
-        body: {
-          refreshToken: this.auth.refreshToken,
-        },
-        parseResponse: JSON.parse,
-      }
-    );
+    try {
+      const res = await this.apiServer(
+        "/basic/agent-workbench/sdk/agent/token/refresh",
+        {
+          method: "POST",
+          body: {
+            refreshToken: this.auth.refreshToken,
+          },
+          parseResponse: JSON.parse,
+        }
+      );
 
-    if (res.code === 0 && res?.data?.token) {
-      this.auth.token = res.data.token;
-      this.auth.refreshToken = res.data.refreshToken;
-      this.auth.expireAt = res.data.expireAt;
-    } else {
-      throw new Error("refreshToken error");
+      if (res.code === 0 && res?.data?.token) {
+        this.auth.token = res.data.token;
+        this.auth.refreshToken = res.data.refreshToken;
+        this.auth.expireAt = res.data.expireAt;
+      } else {
+        throw new Error("refreshToken error");
+      }
+    } catch (error) {
+      throw new Error(`Token refresh failed: ${error}`);
     }
   }
 }
