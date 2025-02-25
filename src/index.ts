@@ -650,12 +650,17 @@ export default class SipCall {
   //发起呼叫
   public call = (phone: string, param: CallExtraParam = {}): String => {
     if (!this.checkPhoneNumber(phone)) {
-      throw new Error("Phone number is not valid");
+      throw new Error("手机号格式不正确，请检查手机号格式。");
     }
     this.micCheck();
     if (this.checkAgentStatus()) {
-      throw new Error("Agent status is not valid");
+      throw new Error("坐席状态异常，请检查坐席状态。");
     }
+
+    if (this.currentSession && !this.currentSession.isEnded()) {
+      throw new Error("当前通话尚未结束，无法发起新的呼叫。");
+    }
+
     //注册情况下发起呼叫
     this.currentCallId = uuidv4();
     if (this.ua && this.ua.isRegistered()) {
