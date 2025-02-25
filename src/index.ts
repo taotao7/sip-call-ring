@@ -636,9 +636,19 @@ export default class SipCall {
     }
   }
 
+  public checkAgentStatus(): boolean {
+    if (!this.sipSocket) {
+      return false;
+    }
+    return [2, 6, 7].includes(this.sipSocket.agentStatus);
+  }
+
   //发起呼叫
   public call = (phone: string, param: CallExtraParam = {}): String => {
     this.micCheck();
+    if (this.checkAgentStatus()) {
+      throw new Error("Agent status is not valid");
+    }
     //注册情况下发起呼叫
     this.currentCallId = uuidv4();
     if (this.ua && this.ua.isRegistered()) {

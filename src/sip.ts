@@ -9,6 +9,7 @@ const TOKEN_REFRESH_THRESHOLD = 1000 * 60 * 90;
 class SipSocket {
   apiServer: $Fetch;
   client: WebSocket;
+  agentStatus: number = 1;
   loginStatus: boolean = false;
   exitStatus: boolean = false;
   loginInfo: {
@@ -106,6 +107,7 @@ class SipSocket {
 
       // 接受服务端的状态
       if (res?.action === "status") {
+        this.agentStatus = res?.content;
         return statusListener(res?.content);
       }
 
