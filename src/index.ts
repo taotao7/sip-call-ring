@@ -653,7 +653,7 @@ export default class SipCall {
       throw new Error("手机号格式不正确，请检查手机号格式。");
     }
     this.micCheck();
-    if (this.checkAgentStatus()) {
+    if (!this.checkAgentStatus()) {
       throw new Error("坐席状态异常，请检查坐席状态。");
     }
 
