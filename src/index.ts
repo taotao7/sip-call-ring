@@ -643,8 +643,15 @@ export default class SipCall {
     return [2, 6, 7].includes(this.sipSocket.agentStatus);
   }
 
+  private checkPhoneNumber(phone: string): boolean {
+    return /^\d+$/.test(phone) && phone.length <= 15;
+  }
+
   //发起呼叫
   public call = (phone: string, param: CallExtraParam = {}): String => {
+    if (!this.checkPhoneNumber(phone)) {
+      throw new Error("Phone number is not valid");
+    }
     this.micCheck();
     if (this.checkAgentStatus()) {
       throw new Error("Agent status is not valid");
