@@ -4,11 +4,13 @@ import { ofetch, $Fetch } from "ofetch";
 const HEARTBEAT_INTERVAL = 2000;
 const LOGIN_TIMEOUT = 10000;
 const TOKEN_REFRESH_THRESHOLD = 1000 * 60 * 90;
+const RECONNECT_INTERVAL = 5000; // 重连间隔时间，5秒
+const MAX_RECONNECT_ATTEMPTS = 5; // 最大重连次数
 
 // 坐席用
 class SipSocket {
   apiServer: $Fetch;
-  client: WebSocket;
+  client: WebSocket | null = null;
   agentStatus: number = 1;
   loginStatus: boolean = false;
   exitStatus: boolean = false;
@@ -26,6 +28,15 @@ class SipSocket {
     expireAt: 0,
   };
   private heartbeatTimer: NodeJS.Timeout | null = null;
+  private reconnectTimer: NodeJS.Timeout | null = null;
+  private reconnectAttempts: number = 0;
+  private baseUrl: string;
+  private apiServerUrl: string;
+  private kickCallback: () => void;
+  private statusListenerCallback: (v: number) => void;
+  private callbackInfoCallback: (v: any) => void;
+  private groupCallNotifyCallback: (v: any) => void;
+  private otherEventCallback: (v: any) => void;
 
   constructor(
     protocol: boolean,
@@ -39,23 +50,33 @@ class SipSocket {
     groupCallNotify: (v: any) => void, // 接受groupCallNotify
     otherEvent: (v: any) => void // 接受其他事件
   ) {
-    const baseUrl =
+    this.baseUrl =
       (protocol ? "wss" : "ws") +
       "://" +
       host +
       ":" +
       port +
       "/agent-workbench/api/ws";
-    const apiServer =
+    this.apiServerUrl =
       (protocol ? "https" : "http") + "://" + host + ":" + port + "/api";
     this.loginInfo = {
       username,
       password,
     };
-    this.client = new WebSocket(baseUrl);
+
+    // 保存回调函数，以便在重连时使用
+    this.kickCallback = kick;
+    this.statusListenerCallback = statusListener;
+    this.callbackInfoCallback = callbackInfo;
+    this.groupCallNotifyCallback = groupCallNotify;
+    this.otherEventCallback = otherEvent;
+
+    // 初始化WebSocket连接
+    this.initWebSocket();
+
     const that = this;
     this.apiServer = ofetch.create({
-      baseURL: apiServer,
+      baseURL: this.apiServerUrl,
       headers: {
         "Content-Type": "application/json",
       },
@@ -75,12 +96,17 @@ class SipSocket {
         }
       },
     });
+  }
+
+  // 初始化WebSocket连接
+  private initWebSocket() {
+    this.client = new WebSocket(this.baseUrl);
     this.listen(
-      kick,
-      statusListener,
-      callbackInfo,
-      groupCallNotify,
-      otherEvent
+      this.kickCallback,
+      this.statusListenerCallback,
+      this.callbackInfoCallback,
+      this.groupCallNotifyCallback,
+      this.otherEventCallback
     );
   }
 
@@ -92,6 +118,9 @@ class SipSocket {
     otherEvent: (v: any) => void
   ) {
     this.client.onopen = () => {
+      console.log("WebSocket连接已建立");
+      // 连接成功，重置重连计数
+      this.reconnectAttempts = 0;
       this.login();
     };
     this.client.onmessage = (event: MessageEvent) => {
@@ -150,8 +179,47 @@ class SipSocket {
       this.loginStatus = false;
       this.auth.token = "";
       this.clearHeartbeat();
-      if (!this.exitStatus) kick();
+
+      // 如果不是主动退出，尝试重连
+      if (!this.exitStatus) {
+        this.attemptReconnect();
+      }
     };
+
+    // 处理连接错误
+    this.client.onerror = (error) => {
+      console.error("WebSocket连接错误:", error);
+      throw error;
+    };
+  }
+
+  // 尝试重新连接
+  private attemptReconnect() {
+    // 清除之前的重连定时器
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+
+    // 如果已经达到最大重试次数，则不再重试
+    if (this.reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+      console.log(`已达到最大重连次数(${MAX_RECONNECT_ATTEMPTS})，停止重连`);
+      this.kickCallback(); // 通知上层连接已断开
+      return;
+    }
+
+    // 增加重试计数
+    this.reconnectAttempts++;
+
+    console.log(
+      `尝试第 ${this.reconnectAttempts} 次重连，将在 ${RECONNECT_INTERVAL / 1000} 秒后重连...`
+    );
+
+    // 设置定时器进行重连
+    this.reconnectTimer = setTimeout(() => {
+      console.log(`正在进行第 ${this.reconnectAttempts} 次重连...`);
+      this.initWebSocket();
+    }, RECONNECT_INTERVAL);
   }
 
   // 没2两秒检测一次登录状态
@@ -218,6 +286,14 @@ class SipSocket {
     }
   }
 
+  // 清除重连定时器
+  private clearReconnectTimer() {
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+  }
+
   public logout() {
     this.exitStatus = true;
     this.auth.token = "";
@@ -225,6 +301,7 @@ class SipSocket {
       this.client.send(JSON.stringify({ action: "logout", actionId: "" }));
     }
     this.clearHeartbeat();
+    this.clearReconnectTimer();
   }
 
   private async getSipWebrtcAddr() {
