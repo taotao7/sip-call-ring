@@ -265,7 +265,7 @@ export default class SipCall {
             this.onChangeState(State.REGISTER_FAILED, {
               msg: "注册失败:" + e.cause,
             });
-            this.sipSocket?.logout();
+            this.sipSocket?.client?.close();
             this.ua.stop();
             this.socket = null;
           });

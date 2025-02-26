@@ -37,6 +37,7 @@ class SipSocket {
   private callbackInfoCallback: (v: any) => void;
   private groupCallNotifyCallback: (v: any) => void;
   private otherEventCallback: (v: any) => void;
+  private checkLoginTimer: NodeJS.Timeout | null = null; // 添加登录检查定时器引用
 
   constructor(
     protocol: boolean,
@@ -100,14 +101,22 @@ class SipSocket {
 
   // 初始化WebSocket连接
   private initWebSocket() {
-    this.client = new WebSocket(this.baseUrl);
-    this.listen(
-      this.kickCallback,
-      this.statusListenerCallback,
-      this.callbackInfoCallback,
-      this.groupCallNotifyCallback,
-      this.otherEventCallback
-    );
+    try {
+      this.client = new WebSocket(this.baseUrl);
+      this.listen(
+        this.kickCallback,
+        this.statusListenerCallback,
+        this.callbackInfoCallback,
+        this.groupCallNotifyCallback,
+        this.otherEventCallback
+      );
+    } catch (error) {
+      console.error("WebSocket初始化失败:", error);
+      // 如果初始化失败且不是主动退出，尝试重连
+      if (!this.exitStatus) {
+        this.attemptReconnect();
+      }
+    }
   }
 
   public listen(
@@ -117,13 +126,21 @@ class SipSocket {
     groupCallNotify: (v: any) => void,
     otherEvent: (v: any) => void
   ) {
+    if (!this.client) {
+      console.error("WebSocket客户端未初始化");
+      return;
+    }
+
     this.client.onopen = () => {
       console.log("WebSocket连接已建立");
       // 连接成功，重置重连计数
       this.reconnectAttempts = 0;
       this.login();
     };
+
     this.client.onmessage = (event: MessageEvent) => {
+      if (!this.client) return;
+
       const res = JSON.parse(event.data);
 
       if (res?.action === "auth" && res?.content) {
@@ -148,13 +165,17 @@ class SipSocket {
       }
 
       if (res?.action === "ping") {
-        return this.client.send(JSON.stringify({ action: "pong" }));
+        if (this.client && this.client.readyState === WebSocket.OPEN) {
+          return this.client.send(JSON.stringify({ action: "pong" }));
+        }
       }
 
       // kick 被踢出就关闭连接
       if (res?.action === "kick") {
         this.loginStatus = false;
-        this.client.close();
+        if (this.client) {
+          this.client.close();
+        }
         this.auth.token = "";
         return kick();
       }
@@ -175,21 +196,30 @@ class SipSocket {
     };
 
     // 当sock断开时
-    this.client.onclose = () => {
+    this.client.onclose = (event) => {
+      console.log(
+        `WebSocket连接已断开，关闭代码: ${event.code}, 原因: ${event.reason}`
+      );
       this.loginStatus = false;
       this.auth.token = "";
       this.clearHeartbeat();
+      this.clearCheckLoginTimer(); // 清除登录检查定时器
 
       // 如果不是主动退出，尝试重连
       if (!this.exitStatus) {
+        console.log("WebSocket连接已断开，准备重连...");
         this.attemptReconnect();
+      } else {
+        console.log("WebSocket连接已主动关闭，不进行重连");
+        this.kickCallback();
       }
     };
 
     // 处理连接错误
     this.client.onerror = (error) => {
       console.error("WebSocket连接错误:", error);
-      throw error;
+      // 不要抛出错误，让onclose处理重连
+      // 移除 throw error;
     };
   }
 
@@ -204,6 +234,7 @@ class SipSocket {
     // 如果已经达到最大重试次数，则不再重试
     if (this.reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
       console.log(`已达到最大重连次数(${MAX_RECONNECT_ATTEMPTS})，停止重连`);
+      this.reconnectAttempts = 0; // 重置重连计数，以便下次可以重新尝试
       this.kickCallback(); // 通知上层连接已断开
       return;
     }
@@ -218,63 +249,150 @@ class SipSocket {
     // 设置定时器进行重连
     this.reconnectTimer = setTimeout(() => {
       console.log(`正在进行第 ${this.reconnectAttempts} 次重连...`);
+
+      // 确保在重连前关闭现有连接
+      if (this.client && this.client.readyState !== WebSocket.CLOSED) {
+        try {
+          this.client.close();
+        } catch (e) {
+          console.error("关闭WebSocket连接失败:", e);
+        }
+      }
+
+      // 重置状态但不设置 exitStatus 为 true
+      this.loginStatus = false;
+      this.auth.token = "";
+      this.clearHeartbeat();
+      this.clearCheckLoginTimer();
+
+      // 重新初始化 WebSocket
       this.initWebSocket();
     }, RECONNECT_INTERVAL);
+  }
+
+  // 清除登录检查定时器
+  private clearCheckLoginTimer() {
+    if (this.checkLoginTimer) {
+      clearInterval(this.checkLoginTimer);
+      this.checkLoginTimer = null;
+    }
   }
 
   // 没2两秒检测一次登录状态
   public checkLogin() {
     return new Promise<any>((resolve, reject) => {
       let start = 0;
-      const timer = setInterval(async () => {
+      this.clearCheckLoginTimer(); // 确保之前的定时器被清除
+
+      this.checkLoginTimer = setInterval(async () => {
         start += HEARTBEAT_INTERVAL;
+
+        // 如果已经主动退出，则停止检查
+        if (this.exitStatus) {
+          this.clearCheckLoginTimer();
+          reject("用户已主动退出");
+          return;
+        }
+
         if (this.loginStatus) {
           try {
             const res = await this.getSipWebrtcAddr();
-            clearInterval(timer);
+            this.clearCheckLoginTimer();
             const params = {
               ...this.auth,
               ...res.data,
             };
             resolve(params);
           } catch (e) {
+            console.error("获取SIP地址失败:", e);
+            this.clearCheckLoginTimer();
+
+            // 如果不是主动退出，尝试重连而不是直接拒绝
+            if (!this.exitStatus) {
+              console.log("获取SIP地址失败，尝试重连...");
+              this.attemptReconnect();
+            }
             reject(e);
-            clearInterval(timer);
           }
         }
+
         if (start > LOGIN_TIMEOUT) {
+          console.log(`登录超时(${LOGIN_TIMEOUT}ms)，检查连接状态`);
+          this.clearCheckLoginTimer();
+
+          // 登录超时不应该直接调用 logout，而是尝试重连
+          if (!this.exitStatus) {
+            console.log("登录超时，尝试重连...");
+            this.attemptReconnect();
+          }
           reject("login timeout");
-          clearInterval(timer);
         }
       }, HEARTBEAT_INTERVAL);
     });
   }
 
   public login() {
+    if (!this.client || this.client.readyState !== WebSocket.OPEN) {
+      console.error("WebSocket未连接，无法登录");
+      if (!this.exitStatus) {
+        this.attemptReconnect();
+      }
+      return;
+    }
+
     const timestamp = new Date().getTime();
     const nonce = Math.random().toString(32).substr(2);
     const { username, password } = this.loginInfo;
-    this.client.send(
-      JSON.stringify({
-        action: "login",
-        actionId: "",
-        params: {
-          username,
-          timestamp,
-          password: md5(timestamp + password + nonce),
-          nonce,
-        },
-      })
-    );
-    this.heartBeat();
+
+    try {
+      this.client.send(
+        JSON.stringify({
+          action: "login",
+          actionId: "",
+          params: {
+            username,
+            timestamp,
+            password: md5(timestamp + password + nonce),
+            nonce,
+          },
+        })
+      );
+      this.heartBeat();
+    } catch (error) {
+      console.error("发送登录请求失败:", error);
+      if (!this.exitStatus) {
+        this.attemptReconnect();
+      }
+    }
   }
 
   public heartBeat() {
-    if (this.client.readyState === WebSocket.OPEN) {
-      this.client.send(JSON.stringify({ action: "ping" }));
-      this.heartbeatTimer = setTimeout(() => {
-        this.heartBeat();
-      }, 2000);
+    if (this.client && this.client.readyState === WebSocket.OPEN) {
+      try {
+        this.client.send(JSON.stringify({ action: "ping" }));
+        this.heartbeatTimer = setTimeout(() => {
+          this.heartBeat();
+        }, 2000);
+      } catch (error) {
+        console.error("发送心跳失败:", error);
+        this.clearHeartbeat();
+
+        // 如果心跳失败且不是主动退出，尝试重连
+        if (!this.exitStatus) {
+          this.attemptReconnect();
+        }
+      }
+    } else {
+      this.clearHeartbeat();
+
+      // 如果WebSocket未连接且不是主动退出，尝试重连
+      if (
+        !this.exitStatus &&
+        (!this.client || this.client.readyState !== WebSocket.CONNECTING)
+      ) {
+        console.log("心跳检测到WebSocket未连接，尝试重连...");
+        this.attemptReconnect();
+      }
     }
   }
 
@@ -295,23 +413,57 @@ class SipSocket {
   }
 
   public logout() {
+    console.log("执行主动登出操作");
     this.exitStatus = true;
     this.auth.token = "";
-    if (this.client.readyState === WebSocket.OPEN) {
-      this.client.send(JSON.stringify({ action: "logout", actionId: "" }));
-    }
+    this.reconnectAttempts = 0; // 重置重连计数
+
     this.clearHeartbeat();
     this.clearReconnectTimer();
+    this.clearCheckLoginTimer();
+
+    if (this.client && this.client.readyState === WebSocket.OPEN) {
+      try {
+        this.client.send(JSON.stringify({ action: "logout", actionId: "" }));
+      } catch (error) {
+        console.error("发送登出请求失败:", error);
+      }
+    }
+
+    // 确保连接关闭
+    if (this.client && this.client.readyState !== WebSocket.CLOSED) {
+      try {
+        this.client.close();
+      } catch (error) {
+        console.error("关闭WebSocket连接失败:", error);
+      }
+    }
+
+    // 确保回调被调用
+    setTimeout(() => {
+      if (this.kickCallback) {
+        this.kickCallback();
+      }
+    }, 100);
   }
 
   private async getSipWebrtcAddr() {
-    return this.apiServer(
-      "/call-center/agent-workbench/sdk/agent/webrtc/addr",
-      {
-        method: "GET",
-        parseResponse: JSON.parse,
+    try {
+      return await this.apiServer(
+        "/call-center/agent-workbench/sdk/agent/webrtc/addr",
+        {
+          method: "GET",
+          parseResponse: JSON.parse,
+        }
+      );
+    } catch (error) {
+      console.error("获取SIP地址失败:", error);
+      // 如果不是主动退出，尝试重连
+      if (!this.exitStatus) {
+        this.attemptReconnect();
       }
-    );
+      throw error;
+    }
   }
 
   public onDialing() {
@@ -423,6 +575,11 @@ class SipSocket {
         throw new Error("refreshToken error");
       }
     } catch (error) {
+      console.error("刷新Token失败:", error);
+      // 如果不是主动退出，尝试重连
+      if (!this.exitStatus) {
+        this.attemptReconnect();
+      }
       throw new Error(`Token refresh failed: ${error}`);
     }
   }
