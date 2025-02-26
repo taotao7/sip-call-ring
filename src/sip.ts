@@ -412,6 +412,73 @@ class SipSocket {
     }
   }
 
+  /**
+   * 手动重连函数，可以在外部调用触发重连
+   * @param resetAttempts 是否重置重连尝试次数，默认为true
+   * @returns 返回一个Promise，重连成功时resolve，失败时reject
+   */
+  public reconnect(resetAttempts: boolean = true): Promise<boolean> {
+    console.log("手动触发重连...");
+
+    // 重置退出状态，确保可以重连
+    this.exitStatus = false;
+
+    // 可选择是否重置重连尝试次数
+    if (resetAttempts) {
+      this.reconnectAttempts = 0;
+    }
+
+    // 清理现有连接和定时器
+    this.clearHeartbeat();
+    this.clearReconnectTimer();
+    this.clearCheckLoginTimer();
+
+    // 关闭现有WebSocket连接
+    if (this.client && this.client.readyState !== WebSocket.CLOSED) {
+      try {
+        this.client.close();
+      } catch (error) {
+        console.error("关闭现有WebSocket连接失败:", error);
+      }
+    }
+
+    // 重置状态
+    this.loginStatus = false;
+    this.auth.token = "";
+
+    // 创建一个Promise来跟踪重连结果
+    return new Promise((resolve, reject) => {
+      // 立即初始化新的WebSocket连接
+      this.initWebSocket();
+
+      // 设置一个超时检查，等待连接和登录完成
+      const checkConnected = setInterval(() => {
+        // 如果已登录，则重连成功
+        if (this.loginStatus) {
+          clearInterval(checkConnected);
+          console.log("手动重连成功");
+          resolve(true);
+        }
+
+        // 如果重连尝试次数超过最大值，则重连失败
+        if (this.reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+          clearInterval(checkConnected);
+          console.log("手动重连失败，已达到最大重试次数");
+          reject(new Error("重连失败，已达到最大重试次数"));
+        }
+      }, 1000); // 每秒检查一次
+
+      // 设置总超时，避免无限等待
+      setTimeout(() => {
+        if (!this.loginStatus) {
+          clearInterval(checkConnected);
+          console.log("手动重连超时");
+          reject(new Error("重连超时"));
+        }
+      }, LOGIN_TIMEOUT * 2); // 使用两倍的登录超时时间作为总超时
+    });
+  }
+
   public logout() {
     console.log("执行主动登出操作");
     this.exitStatus = true;
