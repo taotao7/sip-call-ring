@@ -18,6 +18,10 @@ import {
 import { clearTimeout } from "timers";
 import ring from "./ring";
 
+// 重连相关常量
+const UA_RECONNECT_INTERVAL = 5000; // 重连间隔时间，5秒
+const UA_MAX_RECONNECT_ATTEMPTS = 5; // 最大重连次数
+
 //初始化配置
 interface InitConfig {
   host: string;
@@ -131,6 +135,12 @@ export default class SipCall {
   private ua!: jssip.UA;
   private socket!: jssip.WebSocketInterface | null;
 
+  // 重连相关属性
+  private uaReconnectAttempts: number = 0;
+  private uaReconnectTimer: NodeJS.Timeout | null = null;
+  private isManualDisconnect: boolean = false; // 是否是手动断开连接
+  private lastConfig: InitConfig | null = null; // 保存最后的配置，用于重连
+
   //当前坐席号码
   private localAgent: string;
   //呼叫中session:呼出、呼入、当前
@@ -159,6 +169,7 @@ export default class SipCall {
   constructor(config: InitConfig) {
     //坐席号码
     this.localAgent = config.extNo;
+    this.lastConfig = config; // 保存配置用于重连
 
     if (undefined === config.domain || config.domain.length <= 0) {
       config.domain = config.host;
@@ -206,213 +217,348 @@ export default class SipCall {
         config.groupCallNotify,
         config.otherEvent
       );
-      this.sipSocket
-        .checkLogin()
-        .then((r) => {
-          if (!r.token && !r.host) {
-            throw new Error("login failed");
-          }
-          // JsSIP.C.SESSION_EXPIRES=120,JsSIP.C.MIN_SESSION_EXPIRES=120;
-          let proto = r.ssl ? "wss" : "ws";
-          let wsServer = proto + "://" + r.host + ":" + r.port;
-          this.socket = new jssip.WebSocketInterface(wsServer);
-
-          this.ua = new jssip.UA({
-            sockets: [this.socket],
-            uri: "sip:" + config.extNo + "@" + r.host,
-            password: config.extPwd,
-            register: false,
-            register_expires: 15,
-            session_timers: false,
-            // connection_recovery_max_interval:30,
-            // connection_recovery_min_interval:4,
-            user_agent: "JsSIP 3.9.0",
-          });
-
-          //websocket连接成功
-          this.ua.on("connected", (e) => {
-            this.onChangeState(State.CONNECTED, null);
-            //自动注册
-            if (config.autoRegister) {
-              this.ua.register();
-            }
-          });
-          //websocket连接失败
-          this.ua.on("disconnected", (e: any) => {
-            this.ua.stop();
-            this.socket = null;
-            if (e.error) {
-              this.onChangeState(State.DISCONNECTED, e.reason);
-            }
-          });
-          //注册成功
-          this.ua.on("registered", () => {
-            this.onChangeState(State.REGISTERED, {
-              localAgent: this.localAgent,
-            });
-          });
-          //取消注册
-          this.ua.on("unregistered", () => {
-            // console.log("unregistered:", e);
-            this.ua.stop();
-            this.onChangeState(State.UNREGISTERED, {
-              localAgent: this.localAgent,
-            });
-          });
-          //注册失败
-          this.ua.on("registrationFailed", (e) => {
-            // console.error("registrationFailed", e)
-            this.onChangeState(State.REGISTER_FAILED, {
-              msg: "注册失败:" + e.cause,
-            });
-            this.sipSocket?.client?.close();
-            this.ua.stop();
-            this.socket = null;
-          });
-          //Fired a few seconds before the registration expires
-          this.ua.on("registrationExpiring", () => {
-            // console.log("registrationExpiring")
-            this.ua.register();
-          });
-
-          //电话事件监听
-          this.ua.on(
-            "newRTCSession",
-            (data: IncomingRTCSessionEvent | OutgoingRTCSessionEvent) => {
-              // console.info('on new rtcsession: ', data)
-              let s = data.session;
-              let currentEvent: string;
-              if (data.originator === "remote") {
-                //来电处理
-                //console.info('>>>>>>>>>>>>>>>>>>>>来电>>>>>>>>>>>>>>>>>>>>')
-                this.incomingSession = data.session;
-                this.currentSession = this.incomingSession;
-                this.direction = "inbound";
-                currentEvent = State.INCOMING_CALL;
-                this.playAudio();
-              } else {
-                //console.info('<<<<<<<<<<<<<<<<<<<<外呼<<<<<<<<<<<<<<<<<<<<')
-                this.direction = "outbound";
-                currentEvent = State.OUTGOING_CALL;
-                this.playAudio();
-              }
-
-              s.on("peerconnection", (evt: PeerConnectionEvent) => {
-                // console.info('onPeerconnection');
-                //处理通话中媒体流
-                this.handleAudio(evt.peerconnection);
-              });
-
-              s.on("connecting", () => {
-                // console.info('connecting')
-              });
-
-              //防止检测时间过长
-              let iceCandidateTimeout: NodeJS.Timeout;
-              s.on("icecandidate", (evt: IceCandidateEvent) => {
-                if (iceCandidateTimeout != null) {
-                  clearTimeout(iceCandidateTimeout);
-                }
-                if (
-                  evt.candidate.type === "srflx" ||
-                  evt.candidate.type === "relay"
-                ) {
-                  evt.ready();
-                }
-                iceCandidateTimeout = setTimeout(evt.ready, 1000);
-              });
-
-              s.on("sending", () => {
-                // console.info('sending')
-              });
-
-              s.on("progress", (evt: IncomingEvent | OutgoingEvent) => {
-                // console.info('通话振铃-->通话振铃')
-                //s.remote_identity.display_name
-                if (
-                  [180, 183].includes(
-                    (evt as OutgoingEvent)?.response?.status_code
-                  )
-                ) {
-                  this.sipSocket?.onDialing();
-                }
-                // 拨打电话后告知server状态变动
-                this.onChangeState(currentEvent, {
-                  direction: this.direction,
-                  otherLegNumber: data.request.from.uri.user,
-                  callId: this.currentCallId,
-                });
-              });
-
-              s.on("accepted", (evt: IncomingEvent | OutgoingEvent) => {
-                // console.info('通话中-->通话中')
-                this.stopAudio();
-                this.onChangeState(State.IN_CALL, null);
-              });
-              s.on("accepted", () => {
-                // console.info('accepted')
-              });
-
-              s.on("ended", (evt: any) => {
-                // console.info('通话结束-->通话结束')
-                let evtData: CallEndEvent = {
-                  answered: true,
-                  cause: evt.cause,
-                  code: evt.message?.status_code ?? 0,
-                  originator: evt.originator,
-                };
-                this.stopAudio();
-                this.cleanCallingData();
-                this.onChangeState(State.CALL_END, evtData);
-              });
-
-              s.on("failed", (evt: any) => {
-                // console.info('通话失败-->通话失败')
-                let evtData: CallEndEvent = {
-                  answered: false,
-                  cause: evt.cause,
-                  code: evt.message?.status_code ?? 0,
-                  originator: evt.originator,
-                };
-                this.stopAudio();
-                this.cleanCallingData();
-                this.onChangeState(State.CALL_END, evtData);
-              });
-
-              s.on("hold", (evt: HoldEvent) => {
-                //console.info('通话保持-->通话保持')
-                this.onChangeState(State.HOLD, null);
-              });
-
-              s.on("unhold", (evt: HoldEvent) => {
-                //console.info('通话恢复-->通话恢复')
-                this.stopAudio();
-                this.onChangeState(State.IN_CALL, null);
-              });
-            }
-          );
-
-          this.ua.on(
-            "newMessage",
-            (data: IncomingMessageEvent | OutgoingMessageEvent) => {
-              let s = data.message;
-              s.on("succeeded", (evt) => {
-                // console.log("newMessage-succeeded:", data, evt)
-              });
-              s.on("failed", (evt) => {
-                // console.log("newMessage-succeeded:", data)
-              });
-            }
-          );
-
-          //启动UA
-          this.ua.start();
-        })
-        .catch((e) => {
-          throw new Error(e);
-        });
+      this.initializeUA(config);
     } else {
       throw new Error("username or password is required");
+    }
+  }
+
+  // 初始化 UA
+  private initializeUA(config: InitConfig) {
+    this.sipSocket
+      ?.checkLogin()
+      .then((r) => {
+        if (!r.token && !r.host) {
+          throw new Error("login failed");
+        }
+        // JsSIP.C.SESSION_EXPIRES=120,JsSIP.C.MIN_SESSION_EXPIRES=120;
+        let proto = r.ssl ? "wss" : "ws";
+        let wsServer = proto + "://" + r.host + ":" + r.port;
+        this.socket = new jssip.WebSocketInterface(wsServer);
+
+        this.ua = new jssip.UA({
+          sockets: [this.socket],
+          uri: "sip:" + config.extNo + "@" + r.host,
+          password: config.extPwd,
+          register: false,
+          register_expires: 15,
+          session_timers: false,
+          // connection_recovery_max_interval:30,
+          // connection_recovery_min_interval:4,
+          user_agent: "JsSIP 3.9.0",
+        });
+
+        //websocket连接成功
+        this.ua.on("connected", (e) => {
+          console.log("JsSIP UA 连接成功");
+          // 重置重连计数
+          this.uaReconnectAttempts = 0;
+          this.isManualDisconnect = false;
+          this.onChangeState(State.CONNECTED, null);
+          //自动注册
+          if (config.autoRegister) {
+            this.ua.register();
+          }
+        });
+
+        //websocket连接失败
+        this.ua.on("disconnected", (e: any) => {
+          console.log("JsSIP UA 连接断开", e.reason);
+          this.ua.stop();
+          this.socket = null;
+
+          if (e.error) {
+            this.onChangeState(State.DISCONNECTED, e.reason);
+          }
+
+          // 如果不是手动断开连接，尝试重连
+          if (!this.isManualDisconnect) {
+            console.log("JsSIP UA 连接断开，准备重连...");
+            this.attemptUAReconnect();
+          }
+        });
+
+        //注册成功
+        this.ua.on("registered", () => {
+          console.log("JsSIP UA 注册成功");
+          this.onChangeState(State.REGISTERED, {
+            localAgent: this.localAgent,
+          });
+        });
+
+        //取消注册
+        this.ua.on("unregistered", () => {
+          console.log("JsSIP UA 取消注册");
+          this.ua.stop();
+          this.onChangeState(State.UNREGISTERED, {
+            localAgent: this.localAgent,
+          });
+        });
+
+        //注册失败
+        this.ua.on("registrationFailed", (e) => {
+          console.error("JsSIP UA 注册失败", e.cause);
+          this.onChangeState(State.REGISTER_FAILED, {
+            msg: "注册失败:" + e.cause,
+          });
+
+          // 如果不是手动断开连接，尝试重连
+          if (!this.isManualDisconnect) {
+            console.log("JsSIP UA 注册失败，准备重连...");
+            // 关闭当前连接
+            if (this.sipSocket?.client) {
+              this.sipSocket.client.close();
+            }
+            this.ua.stop();
+            this.socket = null;
+
+            this.attemptUAReconnect();
+          } else {
+            // 如果是手动断开，则正常关闭
+            if (this.sipSocket?.client) {
+              this.sipSocket.client.close();
+            }
+            this.ua.stop();
+            this.socket = null;
+          }
+        });
+
+        //Fired a few seconds before the registration expires
+        this.ua.on("registrationExpiring", () => {
+          console.log("JsSIP UA 注册即将过期，重新注册");
+          this.ua.register();
+        });
+
+        //电话事件监听
+        this.ua.on(
+          "newRTCSession",
+          (data: IncomingRTCSessionEvent | OutgoingRTCSessionEvent) => {
+            // console.info('on new rtcsession: ', data)
+            let s = data.session;
+            let currentEvent: string;
+            if (data.originator === "remote") {
+              //来电处理
+              //console.info('>>>>>>>>>>>>>>>>>>>>来电>>>>>>>>>>>>>>>>>>>>')
+              this.incomingSession = data.session;
+              this.currentSession = this.incomingSession;
+              this.direction = "inbound";
+              currentEvent = State.INCOMING_CALL;
+              this.playAudio();
+            } else {
+              //console.info('<<<<<<<<<<<<<<<<<<<<外呼<<<<<<<<<<<<<<<<<<<<')
+              this.direction = "outbound";
+              currentEvent = State.OUTGOING_CALL;
+              this.playAudio();
+            }
+
+            s.on("peerconnection", (evt: PeerConnectionEvent) => {
+              // console.info('onPeerconnection');
+              //处理通话中媒体流
+              this.handleAudio(evt.peerconnection);
+            });
+
+            s.on("connecting", () => {
+              // console.info('connecting')
+            });
+
+            //防止检测时间过长
+            let iceCandidateTimeout: NodeJS.Timeout;
+            s.on("icecandidate", (evt: IceCandidateEvent) => {
+              if (iceCandidateTimeout != null) {
+                clearTimeout(iceCandidateTimeout);
+              }
+              if (
+                evt.candidate.type === "srflx" ||
+                evt.candidate.type === "relay"
+              ) {
+                evt.ready();
+              }
+              iceCandidateTimeout = setTimeout(evt.ready, 1000);
+            });
+
+            s.on("sending", () => {
+              // console.info('sending')
+            });
+
+            s.on("progress", (evt: IncomingEvent | OutgoingEvent) => {
+              // console.info('通话振铃-->通话振铃')
+              //s.remote_identity.display_name
+              if (
+                [180, 183].includes(
+                  (evt as OutgoingEvent)?.response?.status_code
+                )
+              ) {
+                this.sipSocket?.onDialing();
+              }
+              // 拨打电话后告知server状态变动
+              this.onChangeState(currentEvent, {
+                direction: this.direction,
+                otherLegNumber: data.request.from.uri.user,
+                callId: this.currentCallId,
+              });
+            });
+
+            s.on("accepted", (evt: IncomingEvent | OutgoingEvent) => {
+              // console.info('通话中-->通话中')
+              this.stopAudio();
+              this.onChangeState(State.IN_CALL, null);
+            });
+            s.on("accepted", () => {
+              // console.info('accepted')
+            });
+
+            s.on("ended", (evt: any) => {
+              // console.info('通话结束-->通话结束')
+              let evtData: CallEndEvent = {
+                answered: true,
+                cause: evt.cause,
+                code: evt.message?.status_code ?? 0,
+                originator: evt.originator,
+              };
+              this.stopAudio();
+              this.cleanCallingData();
+              this.onChangeState(State.CALL_END, evtData);
+            });
+
+            s.on("failed", (evt: any) => {
+              // console.info('通话失败-->通话失败')
+              let evtData: CallEndEvent = {
+                answered: false,
+                cause: evt.cause,
+                code: evt.message?.status_code ?? 0,
+                originator: evt.originator,
+              };
+              this.stopAudio();
+              this.cleanCallingData();
+              this.onChangeState(State.CALL_END, evtData);
+            });
+
+            s.on("hold", (evt: HoldEvent) => {
+              //console.info('通话保持-->通话保持')
+              this.onChangeState(State.HOLD, null);
+            });
+
+            s.on("unhold", (evt: HoldEvent) => {
+              //console.info('通话恢复-->通话恢复')
+              this.stopAudio();
+              this.onChangeState(State.IN_CALL, null);
+            });
+          }
+        );
+
+        this.ua.on(
+          "newMessage",
+          (data: IncomingMessageEvent | OutgoingMessageEvent) => {
+            let s = data.message;
+            s.on("succeeded", (evt) => {
+              // console.log("newMessage-succeeded:", data, evt)
+            });
+            s.on("failed", (evt) => {
+              // console.log("newMessage-succeeded:", data)
+            });
+          }
+        );
+
+        //启动UA
+        this.ua.start();
+      })
+      .catch((e) => {
+        console.error("初始化 UA 失败:", e);
+        // 如果初始化失败且不是手动断开连接，尝试重连
+        if (!this.isManualDisconnect) {
+          console.log("初始化 UA 失败，准备重连...");
+          this.attemptUAReconnect();
+        }
+        throw new Error(e);
+      });
+  }
+
+  // 尝试重连 UA
+  private attemptUAReconnect() {
+    // 清除之前的重连定时器
+    if (this.uaReconnectTimer) {
+      clearTimeout(this.uaReconnectTimer);
+      this.uaReconnectTimer = null;
+    }
+
+    // 如果已经达到最大重试次数，则不再重试
+    if (this.uaReconnectAttempts >= UA_MAX_RECONNECT_ATTEMPTS) {
+      console.log(
+        `JsSIP UA 已达到最大重连次数(${UA_MAX_RECONNECT_ATTEMPTS})，停止重连`
+      );
+      this.uaReconnectAttempts = 0; // 重置重连计数，以便下次可以重新尝试
+      return;
+    }
+
+    // 增加重试计数
+    this.uaReconnectAttempts++;
+
+    console.log(
+      `JsSIP UA 尝试第 ${this.uaReconnectAttempts} 次重连，将在 ${UA_RECONNECT_INTERVAL / 1000} 秒后重连...`
+    );
+
+    // 设置定时器进行重连
+    this.uaReconnectTimer = setTimeout(() => {
+      console.log(`JsSIP UA 正在进行第 ${this.uaReconnectAttempts} 次重连...`);
+
+      // 确保有最后的配置
+      if (this.lastConfig) {
+        // 检查 SipSocket 是否已连接
+        if (this.sipSocket && this.sipSocket.loginStatus) {
+          // SipSocket 已连接，直接重连 UA
+          this.initializeUA(this.lastConfig);
+        } else {
+          console.log("SipSocket 未连接，先尝试重连 SipSocket");
+
+          // 如果 SipSocket 未连接，先尝试重连 SipSocket
+          if (this.sipSocket) {
+            this.sipSocket
+              .reconnect()
+              .then(() => {
+                console.log("SipSocket 重连成功，开始重连 UA");
+                this.initializeUA(this.lastConfig!);
+              })
+              .catch((error) => {
+                console.error("SipSocket 重连失败:", error);
+                // SipSocket 重连失败，继续尝试 UA 重连
+                console.log("SipSocket 重连失败，将在下次尝试重连");
+                // 不增加重试计数，因为这次尝试不算
+                this.uaReconnectAttempts--;
+                this.attemptUAReconnect();
+              });
+          } else {
+            console.error("SipSocket 未初始化，无法重连");
+            // 创建新的 SipSocket
+            if (this.lastConfig) {
+              this.sipSocket = new SipSocket(
+                this.lastConfig.proto,
+                this.lastConfig.host,
+                this.lastConfig.port,
+                this.lastConfig.extNo,
+                this.lastConfig.extPwd,
+                this.unregister.bind(this),
+                this.lastConfig.statusListener,
+                this.lastConfig.callbackInfo,
+                this.lastConfig.groupCallNotify,
+                this.lastConfig.otherEvent
+              );
+              // 不增加重试计数，因为这次尝试不算
+              this.uaReconnectAttempts--;
+              this.attemptUAReconnect();
+            }
+          }
+        }
+      } else {
+        console.error("JsSIP UA 重连失败：没有保存的配置");
+      }
+    }, UA_RECONNECT_INTERVAL);
+  }
+
+  // 清除 UA 重连定时器
+  private clearUAReconnectTimer() {
+    if (this.uaReconnectTimer) {
+      clearTimeout(this.uaReconnectTimer);
+      this.uaReconnectTimer = null;
     }
   }
 
@@ -577,6 +723,10 @@ export default class SipCall {
 
   //取消注册
   public unregister() {
+    console.log("手动取消注册");
+    this.isManualDisconnect = true; // 标记为手动断开连接
+    this.clearUAReconnectTimer(); // 清除重连定时器
+
     if (this.ua && this.ua.isConnected() && this.ua.isRegistered()) {
       this.sipSocket?.logout();
       this.ua.unregister({ all: true });
@@ -591,6 +741,10 @@ export default class SipCall {
     //清理sdk
     this.stopAudio();
     this.cleanCallingData();
+
+    // 清除重连定时器
+    this.clearUAReconnectTimer();
+
     if (this.ua) {
       this.ua.stop();
     }
@@ -911,8 +1065,91 @@ export default class SipCall {
     (ringAudio as any).play();
   }
 
-  public reconnect() {
-    return this.sipSocket?.reconnect();
+  // 手动重连 UA 和 SipSocket
+  public reconnect(): Promise<boolean> {
+    console.log("手动触发 SipCall 重连...");
+
+    // 重置手动断开标志
+    this.isManualDisconnect = false;
+
+    // 重置重连计数
+    this.uaReconnectAttempts = 0;
+
+    // 清除重连定时器
+    this.clearUAReconnectTimer();
+
+    // 停止当前 UA
+    if (this.ua) {
+      this.ua.stop();
+    }
+
+    // 清空 socket
+    this.socket = null;
+
+    // 创建一个 Promise 来跟踪重连结果
+    return new Promise((resolve, reject) => {
+      // 首先尝试重连 SipSocket
+      if (this.sipSocket) {
+        this.sipSocket
+          .reconnect()
+          .then(() => {
+            console.log("SipSocket 重连成功，开始重连 UA");
+
+            // 如果有最后的配置，重新初始化 UA
+            if (this.lastConfig) {
+              try {
+                this.initializeUA(this.lastConfig);
+
+                // 设置一个检查 UA 是否连接成功的定时器
+                const checkUAConnected = setInterval(() => {
+                  if (
+                    this.ua &&
+                    this.ua.isConnected() &&
+                    this.ua.isRegistered()
+                  ) {
+                    clearInterval(checkUAConnected);
+                    console.log("UA 重连成功");
+                    resolve(true);
+                  }
+
+                  // 如果重连尝试次数超过最大值，则重连失败
+                  if (this.uaReconnectAttempts >= UA_MAX_RECONNECT_ATTEMPTS) {
+                    clearInterval(checkUAConnected);
+                    console.log("UA 重连失败，已达到最大重试次数");
+                    reject(new Error("UA 重连失败，已达到最大重试次数"));
+                  }
+                }, 1000); // 每秒检查一次
+
+                // 设置总超时，避免无限等待
+                setTimeout(() => {
+                  if (
+                    !this.ua ||
+                    !this.ua.isConnected() ||
+                    !this.ua.isRegistered()
+                  ) {
+                    clearInterval(checkUAConnected);
+                    console.log("UA 重连超时");
+                    reject(new Error("UA 重连超时"));
+                  }
+                }, 30000); // 30秒超时
+              } catch (error) {
+                console.error("重连 UA 失败:", error);
+                reject(error);
+              }
+            } else {
+              console.error("重连 UA 失败：没有保存的配置");
+              reject(new Error("重连 UA 失败：没有保存的配置"));
+            }
+          })
+          .catch((error) => {
+            console.error("SipSocket 重连失败:", error);
+            reject(error);
+          });
+      } else {
+        console.error("重连失败：SipSocket 未初始化");
+        reject(new Error("重连失败：SipSocket 未初始化"));
+      }
+    });
   }
 
   public stopAudio() {
