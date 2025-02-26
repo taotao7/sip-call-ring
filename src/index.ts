@@ -911,6 +911,10 @@ export default class SipCall {
     (ringAudio as any).play();
   }
 
+  public reconnect() {
+    return this.sipSocket?.reconnect();
+  }
+
   public stopAudio() {
     let ringAudio = document.getElementById("ringMediaAudioId");
     if (ringAudio) {

@@ -445,6 +445,7 @@ class SipSocket {
     // 重置状态
     this.loginStatus = false;
     this.auth.token = "";
+    this.agentStatus = 1;
 
     // 创建一个Promise来跟踪重连结果
     return new Promise((resolve, reject) => {
