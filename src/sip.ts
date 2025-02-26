@@ -264,7 +264,6 @@ class SipSocket {
       this.auth.token = "";
       this.clearHeartbeat();
       this.clearCheckLoginTimer();
-
       // 重新初始化 WebSocket
       this.initWebSocket();
     }, RECONNECT_INTERVAL);
