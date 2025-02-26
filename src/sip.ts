@@ -38,6 +38,7 @@ class SipSocket {
   private groupCallNotifyCallback: (v: any) => void;
   private otherEventCallback: (v: any) => void;
   private checkLoginTimer: NodeJS.Timeout | null = null; // 添加登录检查定时器引用
+  private maxReconnectAttemptsReached: boolean = false;
 
   constructor(
     protocol: boolean,
@@ -231,10 +232,14 @@ class SipSocket {
       this.reconnectTimer = null;
     }
 
-    // 如果已经达到最大重试次数，则不再重试
-    if (this.reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+    // 如果已经达到最大重试次数或标记为已达到，则不再重试
+    if (
+      this.reconnectAttempts >= MAX_RECONNECT_ATTEMPTS ||
+      this.maxReconnectAttemptsReached
+    ) {
       console.log(`已达到最大重连次数(${MAX_RECONNECT_ATTEMPTS})，停止重连`);
-      this.reconnectAttempts = 0; // 重置重连计数，以便下次可以重新尝试
+      this.maxReconnectAttemptsReached = true; // 设置标志
+      this.reconnectAttempts = 0; // 重置重连计数，以便下次手动重连可以重新尝试
       this.kickCallback(); // 通知上层连接已断开
       return;
     }
@@ -248,6 +253,12 @@ class SipSocket {
 
     // 设置定时器进行重连
     this.reconnectTimer = setTimeout(() => {
+      // 再次检查是否已达到最大重试次数
+      if (this.maxReconnectAttemptsReached) {
+        console.log("已达到最大重连次数，不再尝试重连");
+        return;
+      }
+
       console.log(`正在进行第 ${this.reconnectAttempts} 次重连...`);
 
       // 确保在重连前关闭现有连接
@@ -264,6 +275,7 @@ class SipSocket {
       this.auth.token = "";
       this.clearHeartbeat();
       this.clearCheckLoginTimer();
+
       // 重新初始化 WebSocket
       this.initWebSocket();
     }, RECONNECT_INTERVAL);
@@ -421,6 +433,9 @@ class SipSocket {
 
     // 重置退出状态，确保可以重连
     this.exitStatus = false;
+
+    // 重置最大重试次数标志
+    this.maxReconnectAttemptsReached = false;
 
     // 可选择是否重置重连尝试次数
     if (resetAttempts) {
