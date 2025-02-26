@@ -225,12 +225,34 @@ export default class SipCall {
 
   // 初始化 UA
   private initializeUA(config: InitConfig) {
+    console.log("开始初始化UA，等待SipSocket获取token...");
+
+    // 确保SipSocket存在
+    if (!this.sipSocket) {
+      console.log("SipSocket不存在，创建新的SipSocket");
+      this.sipSocket = new SipSocket(
+        config.proto,
+        config.host,
+        config.port,
+        config.extNo,
+        config.extPwd,
+        this.unregister.bind(this),
+        config.statusListener,
+        config.callbackInfo,
+        config.groupCallNotify,
+        config.otherEvent
+      );
+    }
+
     this.sipSocket
       ?.checkLogin()
       .then((r) => {
-        if (!r.token && !r.host) {
-          throw new Error("login failed");
+        if (!r.token || !r.host) {
+          throw new Error("login failed: 未获取到有效的token或host");
         }
+
+        console.log("SipSocket获取token成功，开始创建UA...");
+
         // JsSIP.C.SESSION_EXPIRES=120,JsSIP.C.MIN_SESSION_EXPIRES=120;
         let proto = r.ssl ? "wss" : "ws";
         let wsServer = proto + "://" + r.host + ":" + r.port;
@@ -460,6 +482,7 @@ export default class SipCall {
         );
 
         //启动UA
+        console.log("开始启动UA...");
         this.ua.start();
       })
       .catch((e) => {
@@ -503,51 +526,42 @@ export default class SipCall {
 
       // 确保有最后的配置
       if (this.lastConfig) {
-        // 检查 SipSocket 是否已连接
-        if (this.sipSocket && this.sipSocket.loginStatus) {
-          // SipSocket 已连接，直接重连 UA
-          this.initializeUA(this.lastConfig);
-        } else {
-          console.log("SipSocket 未连接，先尝试重连 SipSocket");
-
-          // 如果 SipSocket 未连接，先尝试重连 SipSocket
-          if (this.sipSocket) {
-            this.sipSocket
-              .reconnect()
-              .then(() => {
-                console.log("SipSocket 重连成功，开始重连 UA");
-                this.initializeUA(this.lastConfig!);
-              })
-              .catch((error) => {
-                console.error("SipSocket 重连失败:", error);
-                // SipSocket 重连失败，继续尝试 UA 重连
-                console.log("SipSocket 重连失败，将在下次尝试重连");
-                // 不增加重试计数，因为这次尝试不算
-                this.uaReconnectAttempts--;
-                this.attemptUAReconnect();
-              });
-          } else {
-            console.error("SipSocket 未初始化，无法重连");
-            // 创建新的 SipSocket
-            if (this.lastConfig) {
-              this.sipSocket = new SipSocket(
-                this.lastConfig.proto,
-                this.lastConfig.host,
-                this.lastConfig.port,
-                this.lastConfig.extNo,
-                this.lastConfig.extPwd,
-                this.unregister.bind(this),
-                this.lastConfig.statusListener,
-                this.lastConfig.callbackInfo,
-                this.lastConfig.groupCallNotify,
-                this.lastConfig.otherEvent
-              );
-              // 不增加重试计数，因为这次尝试不算
-              this.uaReconnectAttempts--;
-              this.attemptUAReconnect();
-            }
-          }
+        // 检查 SipSocket 是否存在
+        if (!this.sipSocket) {
+          console.log("SipSocket 不存在，创建新的 SipSocket");
+          this.sipSocket = new SipSocket(
+            this.lastConfig.proto,
+            this.lastConfig.host,
+            this.lastConfig.port,
+            this.lastConfig.extNo,
+            this.lastConfig.extPwd,
+            this.unregister.bind(this),
+            this.lastConfig.statusListener,
+            this.lastConfig.callbackInfo,
+            this.lastConfig.groupCallNotify,
+            this.lastConfig.otherEvent
+          );
         }
+
+        // 无论SipSocket状态如何，都先尝试重连SipSocket
+        // 这样可以确保SipSocket和UA的重连顺序正确
+        console.log("开始重连 SipSocket");
+        this.sipSocket
+          .reconnect()
+          .then(() => {
+            console.log("SipSocket 重连成功，开始初始化 UA");
+            // SipSocket重连成功后，初始化UA
+            // 注意：initializeUA内部会调用checkLogin获取token，然后再创建UA
+            this.initializeUA(this.lastConfig!);
+          })
+          .catch((error) => {
+            console.error("SipSocket 重连失败:", error);
+            // SipSocket重连失败，继续尝试UA重连
+            console.log("SipSocket 重连失败，将在下次尝试重连");
+            // 不增加重试计数，因为这次尝试不算
+            this.uaReconnectAttempts--;
+            this.attemptUAReconnect();
+          });
       } else {
         console.error("JsSIP UA 重连失败：没有保存的配置");
       }
@@ -1098,6 +1112,7 @@ export default class SipCall {
             // 如果有最后的配置，重新初始化 UA
             if (this.lastConfig) {
               try {
+                // 使用initializeUA方法，它会调用checkLogin获取token，然后再创建UA
                 this.initializeUA(this.lastConfig);
 
                 // 设置一个检查 UA 是否连接成功的定时器
@@ -1145,9 +1160,27 @@ export default class SipCall {
             console.error("SipSocket 重连失败:", error);
             reject(error);
           });
+      } else if (this.lastConfig) {
+        // 如果SipSocket不存在但有配置，创建新的SipSocket
+        console.log("SipSocket不存在，创建新的SipSocket");
+        this.sipSocket = new SipSocket(
+          this.lastConfig.proto,
+          this.lastConfig.host,
+          this.lastConfig.port,
+          this.lastConfig.extNo,
+          this.lastConfig.extPwd,
+          this.unregister.bind(this),
+          this.lastConfig.statusListener,
+          this.lastConfig.callbackInfo,
+          this.lastConfig.groupCallNotify,
+          this.lastConfig.otherEvent
+        );
+
+        // 递归调用自身，使用新创建的SipSocket
+        return this.reconnect();
       } else {
-        console.error("重连失败：SipSocket 未初始化");
-        reject(new Error("重连失败：SipSocket 未初始化"));
+        console.error("重连失败：SipSocket 未初始化且没有配置信息");
+        reject(new Error("重连失败：SipSocket 未初始化且没有配置信息"));
       }
     });
   }

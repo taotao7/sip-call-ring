@@ -429,7 +429,7 @@ class SipSocket {
    * @returns 返回一个Promise，重连成功时resolve，失败时reject
    */
   public reconnect(resetAttempts: boolean = true): Promise<boolean> {
-    console.log("手动触发重连...");
+    console.log("手动触发SipSocket重连...");
 
     // 重置退出状态，确保可以重连
     this.exitStatus = false;
@@ -472,15 +472,15 @@ class SipSocket {
         // 如果已登录，则重连成功
         if (this.loginStatus) {
           clearInterval(checkConnected);
-          console.log("手动重连成功");
+          console.log("SipSocket手动重连成功");
           resolve(true);
         }
 
         // 如果重连尝试次数超过最大值，则重连失败
         if (this.reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
           clearInterval(checkConnected);
-          console.log("手动重连失败，已达到最大重试次数");
-          reject(new Error("重连失败，已达到最大重试次数"));
+          console.log("SipSocket手动重连失败，已达到最大重试次数");
+          reject(new Error("SipSocket重连失败，已达到最大重试次数"));
         }
       }, 1000); // 每秒检查一次
 
@@ -488,8 +488,8 @@ class SipSocket {
       setTimeout(() => {
         if (!this.loginStatus) {
           clearInterval(checkConnected);
-          console.log("手动重连超时");
-          reject(new Error("重连超时"));
+          console.log("SipSocket手动重连超时");
+          reject(new Error("SipSocket重连超时"));
         }
       }, LOGIN_TIMEOUT * 2); // 使用两倍的登录超时时间作为总超时
     });
