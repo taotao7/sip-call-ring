@@ -35,6 +35,7 @@ interface InitConfig {
   callbackInfo: (info: any) => void;
   groupCallNotify: (info: any) => void;
   otherEvent: (info: any) => void;
+  kick: () => void;
 }
 
 interface StunConfig {
@@ -200,7 +201,10 @@ export default class SipCall {
         config.extNo,
         config.extPwd,
         //这里监听到action 为kick就断开
-        this.unregister.bind(this),
+        () => {
+          config.kick();
+          this.unregister.bind(this);
+        },
         config.statusListener,
         config.callbackInfo,
         config.groupCallNotify,
