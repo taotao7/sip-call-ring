@@ -343,7 +343,10 @@ export default class SipCall {
                 // 拨打电话后告知server状态变动
                 this.onChangeState(currentEvent, {
                   direction: this.direction,
-                  otherLegNumber: data.request.from.uri.user,
+                  otherLegNumber:
+                    data.originator === "remote"
+                      ? data.request.from.uri.user
+                      : data.request.to.uri.user,
                   callId: this.currentCallId,
                 });
               });
