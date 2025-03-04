@@ -113,6 +113,7 @@ const enum State {
   OUTGOING_CALL = "OUTGOING_CALL", //外呼中
   IN_CALL = "IN_CALL", //通话中
   HOLD = "HOLD", //保持中
+  UNHOLD = "UNHOLD",
   CALL_END = "CALL_END", //通话结束
   MUTE = "MUTE", //静音
   UNMUTE = "UNMUTE", //取消静音
@@ -394,7 +395,7 @@ export default class SipCall {
               s.on("unhold", (evt: HoldEvent) => {
                 //console.info('通话恢复-->通话恢复')
                 this.stopAudio();
-                this.onChangeState(State.IN_CALL, null);
+                this.onChangeState(State.UNHOLD, null);
               });
             }
           );
