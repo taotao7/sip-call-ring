@@ -263,6 +263,7 @@ export default class SipCall {
             this.onChangeState(State.UNREGISTERED, {
               localAgent: this.localAgent,
             });
+            this.sipSocket?.logout();
           });
           //注册失败
           this.ua.on("registrationFailed", (e) => {
