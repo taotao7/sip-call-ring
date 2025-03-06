@@ -149,6 +149,7 @@ class SipSocket {
     this.client.onclose = () => {
       this.loginStatus = false;
       this.auth.token = "";
+      statusListener(1);
       this.clearHeartbeat();
       if (!this.exitStatus) kick();
     };
