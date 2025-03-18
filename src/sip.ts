@@ -12,6 +12,7 @@ class SipSocket {
   agentStatus: number = 1;
   loginStatus: boolean = false;
   exitStatus: boolean = false;
+  rtpId: string | undefined;
   loginInfo: {
     username: string;
     password: string;
@@ -102,6 +103,7 @@ class SipSocket {
         this.auth.refreshToken = res?.content?.refreshToken;
         this.auth.expireAt = res?.content?.expireAt;
         this.loginStatus = true;
+        this.rtpId = res?.content?.rtpengineId;
         return;
       }
 

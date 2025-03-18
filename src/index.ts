@@ -589,7 +589,7 @@ export default class SipCall {
     if (this.ua && this.ua.isConnected() && this.ua.isRegistered()) {
       this.sipSocket?.logout();
       this.ua.unregister({ all: true });
-      this.socket = null;
+      this.cleanSDK();
     } else {
       this.onChangeState(State.ERROR, { msg: "尚未注册，操作禁止." });
     }
@@ -657,7 +657,7 @@ export default class SipCall {
   }
 
   //发起呼叫
-  public call = (phone: string, param: CallExtraParam = {}): String => {
+  public call = (phone: string, param: CallExtraParam = {}): string => {
     if (!this.checkPhoneNumber(phone)) {
       throw new Error("手机号格式不正确，请检查手机号格式。");
     }
@@ -683,6 +683,7 @@ export default class SipCall {
         }
         extraHeaders.push("x-call_center_type: " + "OUTBOUND_CALL");
         extraHeaders.push("x-agent_channel: " + this.localAgent);
+        extraHeaders.push("x-rtp-id: " + this.sipSocket?.rtpId);
       }
       this.outgoingSession = this.ua.call(phone, {
         eventHandlers: {
