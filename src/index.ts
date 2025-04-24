@@ -211,7 +211,12 @@ export default class SipCall {
         //这里监听到action 为kick就断开
         () => {
           config.kick();
-          this.unregister();
+          // 确保在sipSocket断开时，SipCall也正确断开
+          if (this.ua && this.ua.isConnected()) {
+            this.unregister();
+          } else {
+            this.cleanSDK();
+          }
         },
         config.statusListener,
         config.callbackInfo,
@@ -412,10 +417,12 @@ export default class SipCall {
             "newMessage",
             (data: IncomingMessageEvent | OutgoingMessageEvent) => {
               let s = data.message;
-              s.on("succeeded", (evt) => {
+              s.on("succeeded", () => {
+                // 修复: 不要使用ev.kick
                 // console.log("newMessage-succeeded:", data, evt)
               });
-              s.on("failed", (evt) => {
+              s.on("failed", () => {
+                // 修复: 不要使用ev.kick
                 // console.log("newMessage-succeeded:", data)
               });
             }
@@ -616,11 +623,33 @@ export default class SipCall {
     this.stopAudio();
     this.cleanCallingData();
     if (this.ua) {
-      this.ua.stop();
+      try {
+        if (this.ua.isRegistered()) {
+          this.ua.unregister({ all: true });
+        }
+        this.ua.stop();
+      } catch (e) {
+        console.error("清理UA时出错:", e);
+      }
     }
 
     if (this.socket) {
       this.socket = null;
+    }
+
+    // 清理SipSocket相关资源
+    if (this.sipSocket) {
+      try {
+        // 确保WebSocket连接关闭
+        if (
+          this.sipSocket.client &&
+          this.sipSocket.client.readyState === WebSocket.OPEN
+        ) {
+          this.sipSocket.logout();
+        }
+      } catch (e) {
+        console.error("清理SipSocket时出错:", e);
+      }
     }
   }
 
