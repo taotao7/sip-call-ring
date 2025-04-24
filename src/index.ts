@@ -210,11 +210,21 @@ export default class SipCall {
         config.extPwd,
         //这里监听到action 为kick就断开
         () => {
-          config.kick();
-          // 确保在sipSocket断开时，SipCall也正确断开
-          if (this.ua && this.ua.isConnected()) {
-            this.unregister();
-          } else {
+          try {
+            // 先调用用户提供的kick回调
+            if (typeof config.kick === "function") {
+              config.kick();
+            }
+
+            // 确保在sipSocket断开时，SipCall也正确断开
+            if (this.ua && this.ua.isConnected()) {
+              this.unregister();
+            } else {
+              this.cleanSDK();
+            }
+          } catch (err) {
+            console.error("处理kick事件出错:", err);
+            // 尝试进行基本的清理
             this.cleanSDK();
           }
         },

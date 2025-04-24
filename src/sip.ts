@@ -136,7 +136,10 @@ class SipSocket {
         this.loginStatus = false;
         this.client.close();
         this.auth.token = "";
-        return kick();
+        if (typeof kick === "function") {
+          return kick();
+        }
+        return;
       }
 
       // 接受groupCallNotify
@@ -160,7 +163,9 @@ class SipSocket {
       this.auth.token = "";
       statusListener(1);
       this.clearHeartbeat();
-      if (!this.exitStatus) kick();
+      if (!this.exitStatus && typeof kick === "function") {
+        kick();
+      }
     };
   }
 
