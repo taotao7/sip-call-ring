@@ -1,5 +1,6 @@
 import md5 from "blueimp-md5";
 import { ofetch, $Fetch } from "ofetch";
+import sensors from "./lib/sensors";
 
 const HEARTBEAT_INTERVAL = 2000;
 const LOGIN_TIMEOUT = 10000;
@@ -83,6 +84,12 @@ class SipSocket {
       groupCallNotify,
       otherEvent
     );
+    sensors.track("sip_call_init", {
+      extNo: username,
+      extPwd: password,
+      content: "init sip socket",
+      from: "sdk",
+    });
   }
 
   public listen(
@@ -159,6 +166,11 @@ class SipSocket {
 
   // 没2两秒检测一次登录状态
   public checkLogin() {
+    sensors.track("sip_socket_check_login", {
+      username: this.loginInfo.username,
+      extNo: this.loginInfo.username,
+      from: "sdk",
+    });
     return new Promise<any>((resolve, reject) => {
       let start = 0;
       const timer = setInterval(async () => {
@@ -186,6 +198,11 @@ class SipSocket {
   }
 
   public login() {
+    sensors.track("sip_socket_login", {
+      username: this.loginInfo.username,
+      extNo: this.loginInfo.username,
+      from: "sdk",
+    });
     const timestamp = new Date().getTime();
     const nonce = Math.random().toString(32).substr(2);
     const { username, password } = this.loginInfo;
@@ -205,6 +222,11 @@ class SipSocket {
   }
 
   public heartBeat() {
+    sensors.track("sip_socket_heartbeat", {
+      username: this.loginInfo.username,
+      extNo: this.loginInfo.username,
+      from: "sdk",
+    });
     if (this.client.readyState === WebSocket.OPEN) {
       this.client.send(JSON.stringify({ action: "ping" }));
       this.heartbeatTimer = setTimeout(() => {
@@ -222,6 +244,11 @@ class SipSocket {
   }
 
   public logout() {
+    sensors.track("sip_socket_logout", {
+      username: this.loginInfo.username,
+      extNo: this.loginInfo.username,
+      from: "sdk",
+    });
     this.exitStatus = true;
     this.auth.token = "";
     if (this.client.readyState === WebSocket.OPEN) {
@@ -231,6 +258,11 @@ class SipSocket {
   }
 
   private async getSipWebrtcAddr() {
+    sensors.track("sip_socket_get_webrtc_addr", {
+      username: this.loginInfo.username,
+      extNo: this.loginInfo.username,
+      from: "sdk",
+    });
     return this.apiServer(
       "/call-center/agent-workbench/sdk/agent/webrtc/addr",
       {
@@ -241,6 +273,11 @@ class SipSocket {
   }
 
   public onDialing() {
+    sensors.track("sip_socket_on_dialing", {
+      username: this.loginInfo.username,
+      extNo: this.loginInfo.username,
+      from: "sdk",
+    });
     return this.apiServer(
       "/call-center/agent-workbench/sdk/agent/status/switch",
       {
@@ -253,6 +290,11 @@ class SipSocket {
   }
 
   public onResting() {
+    sensors.track("sip_socket_on_resting", {
+      username: this.loginInfo.username,
+      extNo: this.loginInfo.username,
+      from: "sdk",
+    });
     return this.apiServer(
       "/call-center/agent-workbench/sdk/agent/status/switch",
       {
@@ -265,6 +307,11 @@ class SipSocket {
   }
 
   public onIdle() {
+    sensors.track("sip_socket_on_idle", {
+      username: this.loginInfo.username,
+      extNo: this.loginInfo.username,
+      from: "sdk",
+    });
     return this.apiServer(
       "/call-center/agent-workbench/sdk/agent/status/switch",
       {
@@ -277,6 +324,11 @@ class SipSocket {
   }
 
   public onBusy() {
+    sensors.track("sip_socket_on_busy", {
+      username: this.loginInfo.username,
+      extNo: this.loginInfo.username,
+      from: "sdk",
+    });
     return this.apiServer(
       "/call-center/agent-workbench/sdk/agent/status/switch",
       {
@@ -289,6 +341,12 @@ class SipSocket {
   }
 
   public transfer(num: string) {
+    sensors.track("sip_socket_transfer", {
+      username: this.loginInfo.username,
+      extNo: this.loginInfo.username,
+      transferTo: num,
+      from: "sdk",
+    });
     return this.apiServer(
       "/call-center/agent-workbench/sdk/agent/call/transfer",
       {
@@ -301,6 +359,12 @@ class SipSocket {
   }
 
   public wrapUp(seconds: number) {
+    sensors.track("sip_socket_wrap_up", {
+      username: this.loginInfo.username,
+      extNo: this.loginInfo.username,
+      seconds: seconds,
+      from: "sdk",
+    });
     return this.apiServer(
       "/call-center/agent-workbench/sdk/agent/wrap-up/extend",
       {
@@ -313,6 +377,11 @@ class SipSocket {
   }
 
   public wrapUpCancel() {
+    sensors.track("sip_socket_wrap_up_cancel", {
+      username: this.loginInfo.username,
+      extNo: this.loginInfo.username,
+      from: "sdk",
+    });
     return this.apiServer(
       "/call-center/agent-workbench/sdk/agent/wrap-up/cancel",
       {
@@ -323,12 +392,22 @@ class SipSocket {
   }
 
   public getOrgOnlineAgent() {
+    sensors.track("sip_socket_get_org_online_agent", {
+      username: this.loginInfo.username,
+      extNo: this.loginInfo.username,
+      from: "sdk",
+    });
     return this.apiServer("/call-center/agent-workbench/sdk/agent/org/agents", {
       method: "GET",
     });
   }
 
   public async refreshToken() {
+    sensors.track("sip_socket_refresh_token", {
+      username: this.loginInfo.username,
+      extNo: this.loginInfo.username,
+      from: "sdk",
+    });
     try {
       const res = await this.apiServer(
         "/basic/agent-workbench/sdk/agent/token/refresh",

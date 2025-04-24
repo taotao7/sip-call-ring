@@ -32,7 +32,7 @@ export default {
         [
           "@babel/preset-env",
           {
-            module: false,
+            modules: false,
             targets: {
               browsers: "> 0.5%, ie >= 11",
             },

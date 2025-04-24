@@ -17,6 +17,7 @@ import {
 } from "jssip/lib/UA";
 import { clearTimeout } from "timers";
 import ring from "./ring";
+import sensors from "./lib/sensors";
 
 //初始化配置
 interface InitConfig {
@@ -171,6 +172,12 @@ export default class SipCall {
     if (config.stateEventListener !== null) {
       this.stateEventListener = config.stateEventListener;
     }
+    sensors.track("sip_call_init", {
+      extNo: config.extNo,
+      extPwd: config.extPwd,
+      content: "init sip controller",
+      from: "sdk",
+    });
 
     //麦克风检测开启
     if (config.checkMic) {
@@ -204,7 +211,7 @@ export default class SipCall {
         //这里监听到action 为kick就断开
         () => {
           config.kick();
-          this.unregister.bind(this);
+          this.unregister();
         },
         config.statusListener,
         config.callbackInfo,
@@ -575,6 +582,10 @@ export default class SipCall {
 
   //注册请求
   public register() {
+    sensors.track("sip_call_register", {
+      extNo: this.localAgent,
+      from: "sdk",
+    });
     if (this.ua.isConnected()) {
       this.ua.register();
     } else {
@@ -586,6 +597,10 @@ export default class SipCall {
 
   //取消注册
   public unregister() {
+    sensors.track("sip_call_unregister", {
+      extNo: this.localAgent,
+      from: "sdk",
+    });
     if (this.ua && this.ua.isConnected() && this.ua.isRegistered()) {
       this.sipSocket?.logout();
       this.ua.unregister({ all: true });
@@ -610,6 +625,11 @@ export default class SipCall {
   }
 
   public sendMessage = (target: string, content: string) => {
+    sensors.track("sip_call_send_message", {
+      extNo: this.localAgent,
+      target: target,
+      from: "sdk",
+    });
     let options = {
       contentType: "text/plain",
     };
@@ -658,6 +678,13 @@ export default class SipCall {
 
   //发起呼叫
   public call = (phone: string, param: CallExtraParam = {}): string => {
+    sensors.track("sip_call_call", {
+      extNo: this.localAgent,
+      phone: phone,
+      businessId: param.businessId,
+      outNumber: param.outNumber,
+      from: "sdk",
+    });
     if (!this.checkPhoneNumber(phone)) {
       throw new Error("手机号格式不正确，请检查手机号格式。");
     }
@@ -709,6 +736,13 @@ export default class SipCall {
 
   //应答
   public answer() {
+    sensors.track("sip_call_answer", {
+      extNo: this.localAgent,
+      otherLegNumber: this.otherLegNumber,
+      direction: this.direction,
+      callId: this.currentCallId,
+      from: "sdk",
+    });
     if (this.currentSession && this.currentSession.isInProgress()) {
       this.currentSession.answer({
         mediaConstraints: this.constraints,
@@ -723,6 +757,13 @@ export default class SipCall {
 
   //挂断电话
   public hangup() {
+    sensors.track("sip_call_hangup", {
+      extNo: this.localAgent,
+      otherLegNumber: this.otherLegNumber,
+      direction: this.direction,
+      callId: this.currentCallId,
+      from: "sdk",
+    });
     if (this.currentSession && !this.currentSession.isEnded()) {
       this.currentSession.terminate();
     } else {
@@ -734,6 +775,13 @@ export default class SipCall {
 
   //保持通话
   public hold() {
+    sensors.track("sip_call_hold", {
+      extNo: this.localAgent,
+      otherLegNumber: this.otherLegNumber,
+      direction: this.direction,
+      callId: this.currentCallId,
+      from: "sdk",
+    });
     if (!this.currentSession || !this.checkCurrentCallIsActive()) {
       return;
     }
@@ -742,6 +790,13 @@ export default class SipCall {
 
   //取消保持
   public unhold() {
+    sensors.track("sip_call_unhold", {
+      extNo: this.localAgent,
+      otherLegNumber: this.otherLegNumber,
+      direction: this.direction,
+      callId: this.currentCallId,
+      from: "sdk",
+    });
     if (!this.currentSession || !this.checkCurrentCallIsActive()) {
       return;
     }
@@ -753,6 +808,13 @@ export default class SipCall {
 
   //静音
   public mute() {
+    sensors.track("sip_call_mute", {
+      extNo: this.localAgent,
+      otherLegNumber: this.otherLegNumber,
+      direction: this.direction,
+      callId: this.currentCallId,
+      from: "sdk",
+    });
     if (!this.currentSession || !this.checkCurrentCallIsActive()) {
       return;
     }
@@ -762,6 +824,13 @@ export default class SipCall {
 
   //取消静音
   public unmute() {
+    sensors.track("sip_call_unmute", {
+      extNo: this.localAgent,
+      otherLegNumber: this.otherLegNumber,
+      direction: this.direction,
+      callId: this.currentCallId,
+      from: "sdk",
+    });
     if (!this.currentSession || !this.checkCurrentCallIsActive()) {
       return;
     }
@@ -771,6 +840,14 @@ export default class SipCall {
 
   //转接
   public transfer(phone: string) {
+    sensors.track("sip_call_transfer", {
+      extNo: this.localAgent,
+      otherLegNumber: this.otherLegNumber,
+      transferTo: phone,
+      direction: this.direction,
+      callId: this.currentCallId,
+      from: "sdk",
+    });
     if (!this.currentSession || !this.checkCurrentCallIsActive()) {
       return;
     }
@@ -779,6 +856,14 @@ export default class SipCall {
 
   //发送按键
   public sendDtmf(tone: string) {
+    sensors.track("sip_call_send_dtmf", {
+      extNo: this.localAgent,
+      otherLegNumber: this.otherLegNumber,
+      tone: tone,
+      direction: this.direction,
+      callId: this.currentCallId,
+      from: "sdk",
+    });
     if (this.currentSession) {
       this.currentSession.sendDTMF(tone, {
         duration: 160,
@@ -790,6 +875,10 @@ export default class SipCall {
 
   //麦克风检测
   public micCheck() {
+    sensors.track("sip_call_mic_check", {
+      extNo: this.localAgent,
+      from: "sdk",
+    });
     navigator.permissions
       .query({ name: "microphone" } as any)
       .then((result) => {
@@ -879,36 +968,70 @@ export default class SipCall {
 
   // 设置为小休
   public setResting() {
+    sensors.track("sip_call_set_resting", {
+      extNo: this.localAgent,
+      from: "sdk",
+    });
     return this.sipSocket?.onResting();
   }
 
   // 设置为空闲
   public setIdle() {
+    sensors.track("sip_call_set_idle", {
+      extNo: this.localAgent,
+      from: "sdk",
+    });
     return this.sipSocket?.onIdle();
   }
 
   public transferCall(phone: string) {
+    sensors.track("sip_call_transfer_call", {
+      extNo: this.localAgent,
+      transferTo: phone,
+      from: "sdk",
+    });
     return this.sipSocket?.transfer(phone);
   }
 
   // 设置为忙碌
   public setBusy() {
+    sensors.track("sip_call_set_busy", {
+      extNo: this.localAgent,
+      from: "sdk",
+    });
     return this.sipSocket?.onBusy();
   }
 
   public getOrgOnlineAgent() {
+    sensors.track("sip_call_get_org_online_agent", {
+      extNo: this.localAgent,
+      from: "sdk",
+    });
     return this.sipSocket?.getOrgOnlineAgent();
   }
 
   public wrapUp(seconds: number) {
+    sensors.track("sip_call_wrap_up", {
+      extNo: this.localAgent,
+      seconds: seconds,
+      from: "sdk",
+    });
     return this.sipSocket?.wrapUp(seconds);
   }
 
   public wrapUpCancel() {
+    sensors.track("sip_call_wrap_up_cancel", {
+      extNo: this.localAgent,
+      from: "sdk",
+    });
     return this.sipSocket?.wrapUpCancel();
   }
 
   public playAudio() {
+    sensors.track("sip_call_play_audio", {
+      extNo: this.localAgent,
+      from: "sdk",
+    });
     let ringAudio = document.getElementById("ringMediaAudioId");
     if (!ringAudio) {
       ringAudio = document.createElement("audio");
@@ -922,6 +1045,10 @@ export default class SipCall {
   }
 
   public stopAudio() {
+    sensors.track("sip_call_stop_audio", {
+      extNo: this.localAgent,
+      from: "sdk",
+    });
     let ringAudio = document.getElementById("ringMediaAudioId");
     if (ringAudio) {
       document.body.removeChild(ringAudio);

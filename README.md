@@ -125,3 +125,45 @@ sipClient.cleanSDK();
 在IN_CALL事件来确定正在通话
 通过CALL_END来判断电话挂断
 活用事件回调能实现很多功能
+
+下面是所有已更新的埋点信息表格：
+| 类 | 方法 | 埋点事件名 | 埋点参数 |
+| --- | --- | --- | --- |
+| SipSocket | constructor | sip_call_init | extNo, extPwd, content, from: 'sdk' |
+| SipSocket | checkLogin | sip_socket_check_login | username, extNo, from: 'sdk' |
+| SipSocket | login | sip_socket_login | username, extNo, from: 'sdk' |
+| SipSocket | heartBeat | sip_socket_heartbeat | username, extNo, from: 'sdk' |
+| SipSocket | logout | sip_socket_logout | username, extNo, from: 'sdk' |
+| SipSocket | getSipWebrtcAddr | sip_socket_get_webrtc_addr | username, extNo, from: 'sdk' |
+| SipSocket | onDialing | sip_socket_on_dialing | username, extNo, from: 'sdk' |
+| SipSocket | onResting | sip_socket_on_resting | username, extNo, from: 'sdk' |
+| SipSocket | onIdle | sip_socket_on_idle | username, extNo, from: 'sdk' |
+| SipSocket | onBusy | sip_socket_on_busy | username, extNo, from: 'sdk' |
+| SipSocket | transfer | sip_socket_transfer | username, extNo, transferTo, from: 'sdk' |
+| SipSocket | wrapUp | sip_socket_wrap_up | username, extNo, seconds, from: 'sdk' |
+| SipSocket | wrapUpCancel | sip_socket_wrap_up_cancel | username, extNo, from: 'sdk' |
+| SipSocket | getOrgOnlineAgent | sip_socket_get_org_online_agent | username, extNo, from: 'sdk' |
+| SipSocket | refreshToken | sip_socket_refresh_token | username, extNo, from: 'sdk' |
+| SipCall | constructor | sip_call_init | extNo, extPwd, content, from: 'sdk' |
+| SipCall | register | sip_call_register | extNo, from: 'sdk' |
+| SipCall | unregister | sip_call_unregister | extNo, from: 'sdk' |
+| SipCall | sendMessage | sip_call_send_message | extNo, target, from: 'sdk' |
+| SipCall | call | sip_call_call | extNo, phone, businessId, outNumber, from: 'sdk' |
+| SipCall | answer | sip_call_answer | extNo, otherLegNumber, direction, callId, from: 'sdk' |
+| SipCall | hangup | sip_call_hangup | extNo, otherLegNumber, direction, callId, from: 'sdk' |
+| SipCall | hold | sip_call_hold | extNo, otherLegNumber, direction, callId, from: 'sdk' |
+| SipCall | unhold | sip_call_unhold | extNo, otherLegNumber, direction, callId, from: 'sdk' |
+| SipCall | mute | sip_call_mute | extNo, otherLegNumber, direction, callId, from: 'sdk' |
+| SipCall | unmute | sip_call_unmute | extNo, otherLegNumber, direction, callId, from: 'sdk' |
+| SipCall | transfer | sip_call_transfer | extNo, otherLegNumber, transferTo, direction, callId, from: 'sdk' |
+| SipCall | sendDtmf | sip_call_send_dtmf | extNo, otherLegNumber, tone, direction, callId, from: 'sdk' |
+| SipCall | micCheck | sip_call_mic_check | extNo, from: 'sdk' |
+| SipCall | setResting | sip_call_set_resting | extNo, from: 'sdk' |
+| SipCall | setIdle | sip_call_set_idle | extNo, from: 'sdk' |
+| SipCall | transferCall | sip_call_transfer_call | extNo, transferTo, from: 'sdk' |
+| SipCall | setBusy | sip_call_set_busy | extNo, from: 'sdk' |
+| SipCall | getOrgOnlineAgent | sip_call_get_org_online_agent | extNo, from: 'sdk' |
+| SipCall | wrapUp | sip_call_wrap_up | extNo, seconds, from: 'sdk' |
+| SipCall | wrapUpCancel | sip_call_wrap_up_cancel | extNo, from: 'sdk' |
+| SipCall | playAudio | sip_call_play_audio | extNo, from: 'sdk' |
+| SipCall | stopAudio | sip_call_stop_audio | extNo, from: 'sdk' |
