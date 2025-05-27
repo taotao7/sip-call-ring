@@ -174,7 +174,6 @@ export default class SipCall {
     }
     sensors.track("sip_call_init", {
       extNo: config.extNo,
-      extPwd: config.extPwd,
       content: "init sip controller",
       from: "sdk",
     });
@@ -253,7 +252,7 @@ export default class SipCall {
             session_timers: false,
             // connection_recovery_max_interval:30,
             // connection_recovery_min_interval:4,
-            user_agent: "JsSIP 3.9.0",
+            user_agent: "JsSIP 3.9.1",
           });
 
           //websocket连接成功
@@ -580,15 +579,14 @@ export default class SipCall {
     event: string,
     data: StateListenerMessage | CallEndEvent | LatencyStat | null
   ) {
-    if (event === State.LATENCY_STAT && this.stateEventListener) {
-      return this.stateEventListener(event, data);
+    if (event !== State.LATENCY_STAT ) {
+      sensors.track("sip_call_event", {
+        extNo: this.localAgent,
+        callId: this.currentCallId ?? "",
+        eventName: event,
+        content: JSON.stringify(data),
+      });
     }
-
-    sensors.track("sip_call_event", {
-      extNo: this.localAgent,
-      eventName: event,
-      content: JSON.stringify(data),
-    });
     if (undefined === this.stateEventListener) {
       return;
     }
@@ -726,29 +724,58 @@ export default class SipCall {
 
   //发起呼叫
   public call = (phone: string, param: CallExtraParam = {}): string => {
-    sensors.track("sip_call_call", {
-      extNo: this.localAgent,
-      phone: phone,
-      businessId: param.businessId,
-      outNumber: param.outNumber,
-      from: "sdk",
-    });
+    let currentCallId = uuidv4();
     if (!this.checkPhoneNumber(phone)) {
+      sensors.track("sip_call_call", {
+        extNo: this.localAgent,
+        phone: phone,
+        businessId: param.businessId,
+        outNumber: param.outNumber,
+        callId: currentCallId,
+        result: "error",
+        content: "phone number format error",
+        from: "sdk",
+      });
       throw new Error("手机号格式不正确，请检查手机号格式。");
     }
     this.micCheck();
     if (!this.checkAgentStatus()) {
+
+      let content = "";
+      if (!this.sipSocket){
+        content = "websocket not connected";
+      }else{
+        content = "seat status abnormal value:"+this.sipSocket.agentStatus;
+      }
+
+      sensors.track("sip_call_call", {
+        extNo: this.localAgent,
+        phone: phone,
+        businessId: param.businessId,
+        outNumber: param.outNumber,
+        callId: currentCallId,
+        result: "error",
+        content: content,
+        from: "sdk",
+      });
       throw new Error("坐席状态异常，请检查坐席状态。");
     }
 
     if (this.currentSession && !this.currentSession.isEnded()) {
+      sensors.track("sip_call_call_error", {
+        extNo: this.localAgent,
+        phone: phone,
+        businessId: param.businessId,
+        outNumber: param.outNumber,
+        callId: currentCallId,
+        content: "call already exists",
+        from: "sdk",
+      });
       throw new Error("当前通话尚未结束，无法发起新的呼叫。");
     }
-
     //注册情况下发起呼叫
-    this.currentCallId = uuidv4();
     if (this.ua && this.ua.isRegistered()) {
-      const extraHeaders: string[] = ["X-JCallId: " + this.currentCallId];
+      const extraHeaders: string[] = ["X-JCallId: " + currentCallId];
       if (param) {
         if (param.businessId) {
           extraHeaders.push("X-JBusinessId: " + param.businessId);
@@ -775,8 +802,29 @@ export default class SipCall {
       //设置当前通话的session
       this.currentSession = this.outgoingSession;
       this.otherLegNumber = phone;
+      this.currentCallId = currentCallId;
+      sensors.track("sip_call_call", {
+        extNo: this.localAgent,
+        phone: phone,
+        businessId: param.businessId,
+        outNumber: param.outNumber,
+        callId: currentCallId,
+        result: "success",
+        content: "call success",
+        from: "sdk",
+      });
       return this.currentCallId;
     } else {
+      sensors.track("sip_call_call", {
+        extNo: this.localAgent,
+        phone: phone,
+        businessId: param.businessId,
+        outNumber: param.outNumber,
+        callId: currentCallId,
+        result: "error",
+        content: "not registered",
+        from: "sdk",
+      });
       this.onChangeState(State.ERROR, { msg: "请在注册成功后再发起外呼请求." });
       return "";
     }
