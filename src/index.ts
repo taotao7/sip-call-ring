@@ -580,6 +580,15 @@ export default class SipCall {
     event: string,
     data: StateListenerMessage | CallEndEvent | LatencyStat | null
   ) {
+    if (event === State.LATENCY_STAT && this.stateEventListener) {
+      return this.stateEventListener(event, data);
+    }
+
+    sensors.track("sip_call_event", {
+      extNo: this.localAgent,
+      eventName: event,
+      content: JSON.stringify(data),
+    });
     if (undefined === this.stateEventListener) {
       return;
     }
@@ -925,17 +934,28 @@ export default class SipCall {
           this.onChangeState(State.MIC_ERROR, {
             msg: "麦克风权限被禁用,请设置允许使用麦克风",
           });
+
+          this.modal("Mic Permission Denied", "Please allow mic permission");
           return;
         } else if (result.state == "prompt") {
           this.onChangeState(State.MIC_ERROR, {
             msg: "麦克风权限未开启,请设置允许使用麦克风权限后重试",
           });
+          this.modal(
+            "Mic Permission Not Allowed",
+            "Please allow mic permission"
+          );
         }
         //经过了上面的检测，这一步应该不需要了
         if (navigator.mediaDevices == undefined) {
           this.onChangeState(State.MIC_ERROR, {
             msg: "麦克风检测异常,请检查麦克风权限是否开启,是否在HTTPS站点",
           });
+          this.modal(
+            "Mic Error Check Fail",
+            "Please check the mic permission is open and is in https site"
+          );
+
           return;
         }
         navigator.mediaDevices
@@ -949,6 +969,11 @@ export default class SipCall {
             });
           })
           .catch((_) => {
+            this.modal(
+              "Mic Error Check Fail",
+              "Please check the mic is plugged in"
+            );
+
             this.onChangeState(State.MIC_ERROR, {
               msg: "麦克风检测异常,请检查麦克风是否插好",
             });
@@ -1092,5 +1117,194 @@ export default class SipCall {
     if (ringAudio) {
       document.body.removeChild(ringAudio);
     }
+  }
+
+  public refreshToken() {
+    return this.sipSocket?.refreshToken();
+  }
+
+  public modal(title: string, content: string) {
+    // Create compact modal in top-right corner
+    const modal = document.createElement("div");
+    modal.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 10000;
+      pointer-events: none;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    `;
+
+    // Create compact modal content
+    const modalContent = document.createElement("div");
+    modalContent.style.cssText = `
+      background: linear-gradient(145deg, #ffffff, #f8fafc);
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 
+        0 10px 30px rgba(0, 0, 0, 0.15),
+        0 0 0 1px rgba(255, 255, 255, 0.2);
+      max-width: 320px;
+      width: auto;
+      min-width: 280px;
+      transform: translateX(100%) scale(0.95);
+      transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+      position: relative;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      pointer-events: all;
+    `;
+
+    // Add compact icon
+    const iconEl = document.createElement("div");
+    iconEl.style.cssText = `
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 12px;
+      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+    `;
+    iconEl.innerHTML = `
+      <svg width="18" height="18" fill="none" stroke="white" viewBox="0 0 24 24" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+      </svg>
+    `;
+
+    // Add compact title
+    const titleEl = document.createElement("h3");
+    titleEl.textContent = title;
+    titleEl.style.cssText = `
+      margin: 0 0 8px 0;
+      font-size: 18px;
+      font-weight: 600;
+      color: #1f2937;
+      text-align: center;
+      line-height: 1.3;
+    `;
+
+    // Add compact content
+    const contentEl = document.createElement("p");
+    contentEl.textContent = content;
+    contentEl.style.cssText = `
+      margin: 0 0 16px 0;
+      font-size: 14px;
+      line-height: 1.5;
+      color: #6b7280;
+      text-align: center;
+      font-weight: 400;
+    `;
+
+    // Add close button (smaller)
+    const closeBtn = document.createElement("button");
+    closeBtn.textContent = "确定";
+    closeBtn.style.cssText = `
+      background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 8px 20px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+      display: block;
+      margin: 0 auto;
+      min-width: 80px;
+    `;
+
+    // Add close button (X) in top-right corner
+    const closeXBtn = document.createElement("button");
+    closeXBtn.innerHTML = "×";
+    closeXBtn.style.cssText = `
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      background: none;
+      border: none;
+      font-size: 20px;
+      color: #9ca3af;
+      cursor: pointer;
+      padding: 4px;
+      line-height: 1;
+      transition: color 0.2s ease;
+      width: 24px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 4px;
+    `;
+
+    // Add hover effects
+    closeBtn.addEventListener("mouseenter", () => {
+      closeBtn.style.transform = "translateY(-1px)";
+      closeBtn.style.boxShadow = "0 4px 12px rgba(59, 130, 246, 0.4)";
+    });
+
+    closeBtn.addEventListener("mouseleave", () => {
+      closeBtn.style.transform = "translateY(0)";
+      closeBtn.style.boxShadow = "0 2px 8px rgba(59, 130, 246, 0.3)";
+    });
+
+    closeXBtn.addEventListener("mouseenter", () => {
+      closeXBtn.style.color = "#ef4444";
+      closeXBtn.style.backgroundColor = "#fee2e2";
+    });
+
+    closeXBtn.addEventListener("mouseleave", () => {
+      closeXBtn.style.color = "#9ca3af";
+      closeXBtn.style.backgroundColor = "transparent";
+    });
+
+    // Close modal with animation
+    const closeModal = () => {
+      modalContent.style.transform = "translateX(100%) scale(0.95)";
+      setTimeout(() => {
+        if (document.body.contains(modal)) {
+          document.body.removeChild(modal);
+        }
+      }, 300);
+    };
+
+    // Auto close after 5 seconds
+    const autoCloseTimer = setTimeout(closeModal, 5000);
+
+    closeBtn.addEventListener("click", () => {
+      clearTimeout(autoCloseTimer);
+      closeModal();
+    });
+
+    closeXBtn.addEventListener("click", () => {
+      clearTimeout(autoCloseTimer);
+      closeModal();
+    });
+
+    // Close on Escape key
+    const handleKeydown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        clearTimeout(autoCloseTimer);
+        closeModal();
+        document.removeEventListener("keydown", handleKeydown);
+      }
+    };
+    document.addEventListener("keydown", handleKeydown);
+
+    // Assemble modal
+    modalContent.appendChild(closeXBtn);
+    modalContent.appendChild(iconEl);
+    modalContent.appendChild(titleEl);
+    modalContent.appendChild(contentEl);
+    modalContent.appendChild(closeBtn);
+    modal.appendChild(modalContent);
+    document.body.appendChild(modal);
+
+    // Trigger entrance animation
+    requestAnimationFrame(() => {
+      modalContent.style.transform = "translateX(0) scale(1)";
+    });
   }
 }

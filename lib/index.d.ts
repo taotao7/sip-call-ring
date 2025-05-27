@@ -80,5 +80,7 @@ export default class SipCall {
     wrapUpCancel(): Promise<any> | undefined;
     playAudio(): void;
     stopAudio(): void;
+    refreshToken(): Promise<void> | undefined;
+    modal(title: string, content: string): void;
 }
 export {};

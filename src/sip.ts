@@ -424,6 +424,7 @@ class SipSocket {
           parseResponse: JSON.parse,
         }
       );
+      console.log("refreshToken", res);
 
       if (res.code === 0 && res?.data?.token) {
         this.auth.token = res.data.token;
