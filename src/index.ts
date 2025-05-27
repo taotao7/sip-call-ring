@@ -1,6 +1,6 @@
 import * as jssip from "jssip";
-import { v4 as uuidv4 } from "uuid";
 import SipSocket from "./sip";
+import { uuidv7 } from "uuidv7";
 import {
   HoldEvent,
   IceCandidateEvent,
@@ -314,6 +314,7 @@ export default class SipCall {
                 //console.info('>>>>>>>>>>>>>>>>>>>>来电>>>>>>>>>>>>>>>>>>>>')
                 this.incomingSession = data.session;
                 this.currentSession = this.incomingSession;
+                this.currentCallId = data.request.getHeader("x-session-id");
                 this.direction = "inbound";
                 currentEvent = State.INCOMING_CALL;
                 this.playAudio();
@@ -579,7 +580,7 @@ export default class SipCall {
     event: string,
     data: StateListenerMessage | CallEndEvent | LatencyStat | null
   ) {
-    if (event !== State.LATENCY_STAT ) {
+    if (event !== State.LATENCY_STAT) {
       sensors.track("sip_call_event", {
         extNo: this.localAgent,
         callId: this.currentCallId ?? "",
@@ -724,14 +725,14 @@ export default class SipCall {
 
   //发起呼叫
   public call = (phone: string, param: CallExtraParam = {}): string => {
-    let currentCallId = uuidv4();
+    this.currentCallId = uuidv7();
     if (!this.checkPhoneNumber(phone)) {
       sensors.track("sip_call_call", {
         extNo: this.localAgent,
         phone: phone,
         businessId: param.businessId,
         outNumber: param.outNumber,
-        callId: currentCallId,
+        callId: this.currentCallId,
         result: "error",
         content: "phone number format error",
         from: "sdk",
@@ -740,12 +741,11 @@ export default class SipCall {
     }
     this.micCheck();
     if (!this.checkAgentStatus()) {
-
       let content = "";
-      if (!this.sipSocket){
+      if (!this.sipSocket) {
         content = "websocket not connected";
-      }else{
-        content = "seat status abnormal value:"+this.sipSocket.agentStatus;
+      } else {
+        content = "seat status abnormal value:" + this.sipSocket.agentStatus;
       }
 
       sensors.track("sip_call_call", {
@@ -753,7 +753,7 @@ export default class SipCall {
         phone: phone,
         businessId: param.businessId,
         outNumber: param.outNumber,
-        callId: currentCallId,
+        callId: this.currentCallId,
         result: "error",
         content: content,
         from: "sdk",
@@ -767,7 +767,7 @@ export default class SipCall {
         phone: phone,
         businessId: param.businessId,
         outNumber: param.outNumber,
-        callId: currentCallId,
+        callId: this.currentCallId,
         content: "call already exists",
         from: "sdk",
       });
@@ -775,7 +775,7 @@ export default class SipCall {
     }
     //注册情况下发起呼叫
     if (this.ua && this.ua.isRegistered()) {
-      const extraHeaders: string[] = ["X-JCallId: " + currentCallId];
+      const extraHeaders: string[] = ["X-JCallId: " + this.currentCallId];
       if (param) {
         if (param.businessId) {
           extraHeaders.push("X-JBusinessId: " + param.businessId);
@@ -783,6 +783,8 @@ export default class SipCall {
         if (param.outNumber) {
           extraHeaders.push("X-JOutNumber: " + param.outNumber);
         }
+
+        extraHeaders.push("x-session-id: " + `CCMDL${this.currentCallId}`);
         extraHeaders.push("x-call_center_type: " + "OUTBOUND_CALL");
         extraHeaders.push("x-agent_channel: " + this.localAgent);
         extraHeaders.push("x-rtp-id: " + this.sipSocket?.rtpId);
@@ -802,13 +804,13 @@ export default class SipCall {
       //设置当前通话的session
       this.currentSession = this.outgoingSession;
       this.otherLegNumber = phone;
-      this.currentCallId = currentCallId;
+      this.currentCallId = this.currentCallId;
       sensors.track("sip_call_call", {
         extNo: this.localAgent,
         phone: phone,
         businessId: param.businessId,
         outNumber: param.outNumber,
-        callId: currentCallId,
+        callId: this.currentCallId,
         result: "success",
         content: "call success",
         from: "sdk",
@@ -820,7 +822,7 @@ export default class SipCall {
         phone: phone,
         businessId: param.businessId,
         outNumber: param.outNumber,
-        callId: currentCallId,
+        callId: this.currentCallId,
         result: "error",
         content: "not registered",
         from: "sdk",
