@@ -725,7 +725,7 @@ export default class SipCall {
 
   //发起呼叫
   public call = (phone: string, param: CallExtraParam = {}): string => {
-    this.currentCallId = uuidv7();
+    this.currentCallId = uuidv7().replace(/-/g, "");
     if (!this.checkPhoneNumber(phone)) {
       sensors.track("sip_call_call", {
         extNo: this.localAgent,
