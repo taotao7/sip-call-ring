@@ -26,6 +26,8 @@ type StunType = "turn" | "stun";
 interface CallExtraParam {
     outNumber?: string;
     businessId?: string;
+    ticketId?: string;
+    orderId?: string;
 }
 export default class SipCall {
     private constraints;
