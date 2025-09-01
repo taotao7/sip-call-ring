@@ -1,6 +1,6 @@
 {
   "name": "sip-call-ring",
-  "version": "1.6.5",
+  "version": "1.7.1",
   "description": "jssip freeswitch have ring call",
   "keywords": [
     "jssip",

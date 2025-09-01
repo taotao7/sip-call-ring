@@ -85,6 +85,8 @@ interface NetworkLatencyStat {
 interface CallExtraParam {
   outNumber?: string;
   businessId?: string;
+  ticketId?: string;
+  orderId?: string;
 }
 
 interface CallEndEvent {
@@ -782,6 +784,12 @@ export default class SipCall {
         }
         if (param.outNumber) {
           extraHeaders.push("X-JOutNumber: " + param.outNumber);
+        }
+        if(param.ticketId) {
+          extraHeaders.push("X-JTicketId: " + param.ticketId);
+        }
+        if (param.orderId) {
+          extraHeaders.push("X-JOrderId: " + param.orderId);
         }
 
         extraHeaders.push("x-session-id: " + `CCMDL${this.currentCallId}`);
